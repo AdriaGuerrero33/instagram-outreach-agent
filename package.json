@@ -1,0 +1,19 @@
+{
+  "name": "instagram-outreach-agent",
+  "version": "1.0.0",
+  "description": "Automated Instagram DM outreach agent using Playwright and OpenRouter Owl Alpha",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "postinstall": "playwright install chromium --with-deps"
+  },
+  "dependencies": {
+    "playwright": "latest",
+    "openai": "latest",
+    "node-cron": "latest",
+    "dotenv": "latest"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
