@@ -245,7 +245,9 @@ async function runOutreach(dailyLimit = 20) {
       count++;
 
       if (count < dailyLimit && status === 'sent') {
-        const wait = randomInt(3 * 60000, 8 * 60000);
+        const { load: loadConfig } = require('./config');
+        const cfg = loadConfig();
+        const wait = randomInt(cfg.intervalMin * 60000, cfg.intervalMax * 60000);
         log(`[outreach] Waiting ${Math.round(wait / 60000)} min before next DM...`);
         await sleep(wait);
       }

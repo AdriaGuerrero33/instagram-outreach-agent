@@ -7,10 +7,7 @@ const { load: loadConfig, save: saveConfig } = require('./config');
 const app = express();
 app.use(express.json());
 
-// Landing page is always public
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-
-// Auth middleware — only protects /panel and /api/*
+// Auth middleware — protects everything
 const PASS = process.env.DASHBOARD_PASSWORD;
 function requireAuth(req, res, next) {
   if (!PASS) return next();
@@ -27,8 +24,8 @@ function requireAuth(req, res, next) {
   next();
 }
 
-app.get('/panel', requireAuth, (req, res) => res.sendFile(path.join(__dirname, 'public', 'panel.html')));
-app.use('/api', requireAuth);
+app.use(requireAuth);
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'panel.html')));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ── Config ────────────────────────────────────────────────────
@@ -36,11 +33,13 @@ app.get('/api/config', (req, res) => res.json(loadConfig()));
 
 app.post('/api/config', (req, res) => {
   const cfg = { ...loadConfig(), ...req.body };
-  cfg.cronHour = parseInt(cfg.cronHour, 10);
-  cfg.cronMinute = parseInt(cfg.cronMinute, 10);
-  cfg.dailyLimit = parseInt(cfg.dailyLimit, 10);
+  cfg.cronHour    = parseInt(cfg.cronHour, 10);
+  cfg.cronMinute  = parseInt(cfg.cronMinute, 10);
+  cfg.dailyLimit  = parseInt(cfg.dailyLimit, 10);
+  cfg.intervalMin = parseInt(cfg.intervalMin, 10);
+  cfg.intervalMax = parseInt(cfg.intervalMax, 10);
   saveConfig(cfg);
-  log(`[dashboard] Config saved → ${cfg.cronHour}:${String(cfg.cronMinute).padStart(2,'0')} UTC, limit ${cfg.dailyLimit}, enabled ${cfg.enabled}`);
+  log(`[dashboard] Config saved → ${cfg.cronHour}:${String(cfg.cronMinute).padStart(2,'0')} UTC, limit ${cfg.dailyLimit}, interval ${cfg.intervalMin}-${cfg.intervalMax}min`);
   require('./scheduler').reschedule(cfg);
   res.json(cfg);
 });
@@ -57,7 +56,7 @@ app.get('/api/stats', (req, res) => {
   const { loadLeads } = require('./instagram');
   const leads = loadLeads();
   const today = new Date().toDateString();
-  const sentAll = leads.filter((l) => l.status === 'sent');
+  const sentAll   = leads.filter((l) => l.status === 'sent');
   const sentToday = sentAll.filter((l) => new Date(l.timestamp).toDateString() === today);
   const last = leads.length ? leads[leads.length - 1].timestamp : null;
   res.json({ total: leads.length, sent: sentAll.length, today: sentToday.length, lastRun: last });

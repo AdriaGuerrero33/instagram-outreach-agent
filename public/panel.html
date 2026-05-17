@@ -10,14 +10,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 header{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;background:linear-gradient(135deg,#1a1a2e,#16213e);border-bottom:1px solid #2a2a4a}
 header h1{font-size:1.1rem;font-weight:700}
 header h1 span{background:linear-gradient(90deg,#e1306c,#833ab4);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-header a{color:#555;font-size:.8rem;text-decoration:none}
-header a:hover{color:#aaa}
 #status-badge{display:flex;align-items:center;gap:8px;font-size:.8rem;color:#888;padding:5px 14px;border:1px solid #2a2a4a;border-radius:20px;background:#111}
 #status-dot{width:8px;height:8px;border-radius:50%;background:#4caf50;transition:background .3s}
 #status-dot.running{background:#e1306c;animation:pulse 1s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-main{display:grid;grid-template-columns:300px 1fr;gap:18px;padding:20px;max-width:1100px;margin:0 auto}
-.stats{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+main{display:grid;grid-template-columns:340px 1fr;gap:18px;padding:20px;max-width:1200px;margin:0 auto}
+.stats{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 .card{background:#1a1a2e;border:1px solid #2a2a4a;border-radius:12px;padding:16px 20px}
 .card-label{font-size:.7rem;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
 .card-value{font-size:1.9rem;font-weight:700;color:#fff}
@@ -27,8 +25,11 @@ main{display:grid;grid-template-columns:300px 1fr;gap:18px;padding:20px;max-widt
 .panel h2{font-size:.8rem;text-transform:uppercase;letter-spacing:1px;color:#555;margin-bottom:16px;border-bottom:1px solid #2a2a4a;padding-bottom:10px}
 .field{margin-bottom:14px}
 .field label{display:block;font-size:.78rem;color:#aaa;margin-bottom:5px}
-.field input[type=number]{width:100%;padding:9px 12px;background:#0f0f1a;border:1px solid #2a2a4a;border-radius:8px;color:#fff;font-size:.9rem;outline:none;transition:border .2s}
-.field input[type=number]:focus{border-color:#833ab4}
+.field input[type=number],.field textarea{width:100%;padding:9px 12px;background:#0f0f1a;border:1px solid #2a2a4a;border-radius:8px;color:#fff;font-size:.85rem;outline:none;transition:border .2s;font-family:inherit}
+.field input[type=number]:focus,.field textarea:focus{border-color:#833ab4}
+.field textarea{resize:vertical;min-height:120px;line-height:1.5}
+.field .hint{font-size:.7rem;color:#444;margin-top:4px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .time-row{display:grid;grid-template-columns:1fr 14px 1fr;gap:4px;align-items:center}
 .time-row span{text-align:center;color:#444;font-size:1.2rem;padding-top:5px}
 .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0}
@@ -41,11 +42,11 @@ main{display:grid;grid-template-columns:300px 1fr;gap:18px;padding:20px;max-widt
 .toggle input:checked+.slider:before{transform:translateX(20px)}
 .btn{width:100%;padding:10px;border:none;border-radius:8px;cursor:pointer;font-size:.88rem;font-weight:600;transition:opacity .2s,transform .1s}
 .btn:active{transform:scale(.98)}
-.btn-primary{background:linear-gradient(135deg,#e1306c,#833ab4);color:#fff;margin-bottom:9px}
-.btn-secondary{background:#1e1e3a;color:#aaa;border:1px solid #2a2a4a}
+.btn-run{background:linear-gradient(135deg,#e1306c,#833ab4);color:#fff;margin-bottom:9px;font-size:1rem;padding:13px}
+.btn-save{background:#1e1e3a;color:#aaa;border:1px solid #2a2a4a;margin-bottom:9px}
 .btn:disabled{opacity:.4;cursor:not-allowed}
 .leads-panel{overflow:hidden;display:flex;flex-direction:column}
-.table-wrap{overflow-y:auto;max-height:300px}
+.table-wrap{overflow-y:auto;max-height:280px}
 table{width:100%;border-collapse:collapse;font-size:.8rem}
 th{position:sticky;top:0;background:#1a1a2e;color:#555;text-transform:uppercase;font-size:.68rem;letter-spacing:.8px;padding:7px 10px;text-align:left;border-bottom:1px solid #2a2a4a;z-index:1}
 td{padding:8px 10px;border-bottom:1px solid #1a1a2e;color:#ccc;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -62,63 +63,95 @@ tr:hover td{background:#1e1e32}
 #log-box{background:#0d1117;border:1px solid #1e2430;border-radius:8px;padding:12px;font-family:Consolas,'JetBrains Mono',monospace;font-size:.73rem;line-height:1.7;color:#8b949e;height:200px;overflow-y:auto}
 .log-ts{color:#333}.log-ok{color:#3fb950}.log-warn{color:#d29922}.log-err{color:#f85149}.log-info{color:#8b949e}
 #run-msg{margin-top:10px;font-size:.76rem;color:#555;text-align:center;min-height:16px}
+.right-col{display:flex;flex-direction:column;gap:18px}
 </style>
 </head>
 <body>
 <header>
-  <h1>📲 <span>DM Agent</span> — Panel</h1>
-  <div style="display:flex;align-items:center;gap:16px">
-    <a href="/">← Web pública</a>
-    <div id="status-badge">
-      <div id="status-dot"></div>
-      <span id="status-text">Idle</span>
-    </div>
+  <h1>📲 <span>DM Agent</span> — Panel de control</h1>
+  <div id="status-badge">
+    <div id="status-dot"></div>
+    <span id="status-text">Idle</span>
   </div>
 </header>
 
 <main>
+  <!-- Stats -->
   <div class="stats">
-    <div class="card"><div class="card-label">Total DMs</div><div class="card-value" id="stat-total">—</div><div class="card-sub" id="stat-sent-sub"></div></div>
+    <div class="card"><div class="card-label">Total leads</div><div class="card-value" id="stat-total">—</div><div class="card-sub" id="stat-sent-sub"></div></div>
     <div class="card"><div class="card-label">Enviados hoy</div><div class="card-value pink" id="stat-today">—</div><div class="card-sub" id="stat-today-sub"></div></div>
-    <div class="card"><div class="card-label">Última ejecución</div><div class="card-value" style="font-size:.95rem;padding-top:4px" id="stat-last">—</div><div class="card-sub" id="stat-next">—</div></div>
+    <div class="card"><div class="card-label">Total enviados</div><div class="card-value" id="stat-sent">—</div><div class="card-sub">acumulado</div></div>
+    <div class="card"><div class="card-label">Última ejecución</div><div class="card-value" style="font-size:.9rem;padding-top:6px" id="stat-last">—</div><div class="card-sub" id="stat-next">—</div></div>
   </div>
 
-  <div class="panel">
-    <h2>Horario del agente</h2>
+  <!-- Left: config panel -->
+  <div class="panel" style="align-self:start">
+    <h2>Configuración</h2>
+
+    <!-- Run now -->
+    <button class="btn btn-run" id="btn-run" onclick="runNow()">▶ Enviar ahora</button>
+    <div id="run-msg"></div>
+
+    <div style="border-top:1px solid #2a2a4a;margin:16px 0"></div>
+
+    <!-- Schedule -->
     <div class="field">
-      <label>Hora de envío (UTC)</label>
+      <label>Hora de envío automático (UTC)</label>
       <div class="time-row">
         <input type="number" id="cfg-hour" min="0" max="23" placeholder="HH">
         <span>:</span>
         <input type="number" id="cfg-minute" min="0" max="59" placeholder="MM">
       </div>
     </div>
+
+    <!-- Daily limit -->
     <div class="field">
       <label>Límite diario de DMs</label>
       <input type="number" id="cfg-limit" min="1" max="50">
     </div>
+
+    <!-- Intervals -->
+    <div class="field">
+      <label>Intervalo entre DMs (minutos)</label>
+      <div class="row2">
+        <input type="number" id="cfg-intmin" min="1" max="60" placeholder="Mín">
+        <input type="number" id="cfg-intmax" min="1" max="120" placeholder="Máx">
+      </div>
+      <div class="hint">Espera aleatoria entre mensajes para parecer humano</div>
+    </div>
+
+    <!-- Enabled toggle -->
     <div class="toggle-row">
       <span class="toggle-label">Agente activo</span>
       <label class="toggle"><input type="checkbox" id="cfg-enabled" checked><span class="slider"></span></label>
     </div>
-    <button class="btn btn-primary" id="btn-save" onclick="saveConfig()">Guardar cambios</button>
-    <button class="btn btn-secondary" id="btn-run" onclick="runNow()">▶ Ejecutar ahora</button>
-    <div id="run-msg"></div>
-  </div>
 
-  <div class="panel leads-panel">
-    <h2>Leads contactados</h2>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Usuario</th><th>Bio</th><th>Estado</th><th>Fecha</th></tr></thead>
-        <tbody id="leads-body"><tr><td colspan="4" class="empty-state">Cargando...</td></tr></tbody>
-      </table>
+    <!-- DM prompt -->
+    <div class="field" style="margin-top:6px">
+      <label>Plantilla del DM <span style="color:#444;font-weight:400">(usa {bio})</span></label>
+      <textarea id="cfg-prompt"></textarea>
+      <div class="hint">"{bio}" se reemplaza con la bio de cada perfil automáticamente</div>
     </div>
+
+    <button class="btn btn-save" id="btn-save" onclick="saveConfig()">Guardar cambios</button>
   </div>
 
-  <div class="panel logs-panel">
-    <h2>Logs en tiempo real <button onclick="document.getElementById('log-box').innerHTML=''">Limpiar</button></h2>
-    <div id="log-box"></div>
+  <!-- Right: leads + logs -->
+  <div class="right-col">
+    <div class="panel leads-panel">
+      <h2>Leads contactados</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Usuario</th><th>Bio</th><th>Estado</th><th>Fecha</th></tr></thead>
+          <tbody id="leads-body"><tr><td colspan="4" class="empty-state">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel logs-panel">
+      <h2>Logs en tiempo real <button onclick="document.getElementById('log-box').innerHTML=''">Limpiar</button></h2>
+      <div id="log-box"></div>
+    </div>
   </div>
 </main>
 
@@ -128,13 +161,13 @@ function nextRun(h,m){const now=new Date(),next=new Date(Date.UTC(now.getUTCFull
 function logClass(m){if(/error|fatal|failed/i.test(m))return'log-err';if(/warn|skip/i.test(m))return'log-warn';if(/sent|success|saved|login successful/i.test(m))return'log-ok';return'log-info'}
 
 async function loadStats(){
-  const s=await fetch('/api/stats').then(r=>r.json());
+  const[s,cfg]=await Promise.all([fetch('/api/stats').then(r=>r.json()),fetch('/api/config').then(r=>r.json())]);
   document.getElementById('stat-total').textContent=s.total;
-  document.getElementById('stat-sent-sub').textContent=s.sent+' confirmados';
+  document.getElementById('stat-sent-sub').textContent='leads totales';
   document.getElementById('stat-today').textContent=s.today;
-  document.getElementById('stat-today-sub').textContent='de '+document.getElementById('cfg-limit').value+' límite';
+  document.getElementById('stat-today-sub').textContent='de '+cfg.dailyLimit+' límite';
+  document.getElementById('stat-sent').textContent=s.sent;
   document.getElementById('stat-last').textContent=fmt(s.lastRun);
-  const cfg=await fetch('/api/config').then(r=>r.json());
   document.getElementById('stat-next').textContent=cfg.enabled?nextRun(cfg.cronHour,cfg.cronMinute):'Agente desactivado';
 }
 
@@ -143,7 +176,10 @@ async function loadConfig(){
   document.getElementById('cfg-hour').value=cfg.cronHour;
   document.getElementById('cfg-minute').value=String(cfg.cronMinute).padStart(2,'0');
   document.getElementById('cfg-limit').value=cfg.dailyLimit;
+  document.getElementById('cfg-intmin').value=cfg.intervalMin??3;
+  document.getElementById('cfg-intmax').value=cfg.intervalMax??8;
   document.getElementById('cfg-enabled').checked=cfg.enabled;
+  document.getElementById('cfg-prompt').value=cfg.dmPrompt||'';
 }
 
 async function saveConfig(){
@@ -153,7 +189,10 @@ async function saveConfig(){
     cronHour:parseInt(document.getElementById('cfg-hour').value),
     cronMinute:parseInt(document.getElementById('cfg-minute').value),
     dailyLimit:parseInt(document.getElementById('cfg-limit').value),
-    enabled:document.getElementById('cfg-enabled').checked
+    intervalMin:parseInt(document.getElementById('cfg-intmin').value),
+    intervalMax:parseInt(document.getElementById('cfg-intmax').value),
+    enabled:document.getElementById('cfg-enabled').checked,
+    dmPrompt:document.getElementById('cfg-prompt').value,
   })});
   btn.textContent='✓ Guardado';setTimeout(()=>{btn.textContent='Guardar cambios';btn.disabled=false},2000);
   loadStats();
@@ -165,7 +204,7 @@ async function runNow(){
   const res=await fetch('/api/run',{method:'POST'});
   if(res.status===409){msg.textContent='Ya está en ejecución.';msg.style.color='#ff9800';}
   else{msg.textContent='Iniciado. Revisa los logs.';msg.style.color='#4caf50';}
-  btn.disabled=false;
+  setTimeout(()=>{btn.disabled=false;msg.textContent=''},3000);
 }
 
 async function loadLeads(){
@@ -187,11 +226,12 @@ async function pollStatus(){
   const{running}=await fetch('/api/status').then(r=>r.json());
   dot.className=running?'running':'';
   stText.textContent=running?'Ejecutando...':'Idle';
-  runBtn.textContent=running?'⏳ En ejecución':'▶ Ejecutar ahora';
+  runBtn.textContent=running?'⏳ En ejecución':'▶ Enviar ahora';
 }
 
 loadConfig();loadStats();loadLeads();pollStatus();
-setInterval(pollStatus,4000);setInterval(()=>{loadStats();loadLeads()},15000);
+setInterval(pollStatus,4000);
+setInterval(()=>{loadStats();loadLeads()},15000);
 </script>
 </body>
 </html>

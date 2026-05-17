@@ -1,6 +1,7 @@
 require('dotenv').config();
 const OpenAI = require('openai');
 const { log } = require('./logger');
+const { load: loadConfig } = require('./config');
 
 const client = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
@@ -13,13 +14,9 @@ const client = new OpenAI({
 
 const MODEL = process.env.LLM_MODEL || 'openrouter/owl-alpha';
 
-const BASE_PROMPT = `Eres un emprendedor que quiere conectar genuinamente con otros emprendedores en Instagram.
-Escribe un DM corto (3-4 líneas) basado en la bio de esta persona: "{bio}".
-El mensaje debe sonar humano y natural, mencionar algo específico de su bio,
-y terminar con una pregunta abierta. Sin emojis excesivos. En español.`;
-
 async function generateDM(bio) {
-  const prompt = BASE_PROMPT.replace('{bio}', bio || 'emprendedor en Instagram');
+  const cfg = loadConfig();
+  const prompt = cfg.dmPrompt.replace('{bio}', bio || 'emprendedor en Instagram');
   const response = await client.chat.completions.create({
     model: MODEL,
     messages: [{ role: 'user', content: prompt }],
