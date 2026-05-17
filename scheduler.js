@@ -1,21 +1,29 @@
 require('dotenv').config();
 const cron = require('node-cron');
-const { runOutreach } = require('./instagram');
+const { log } = require('./logger');
+const { load: loadConfig } = require('./config');
 
-const hour = process.env.CRON_HOUR || '9';
-const minute = process.env.CRON_MINUTE || '30';
-const dailyLimit = parseInt(process.env.DAILY_LIMIT || '20', 10);
+let task = null;
 
-const cronExpression = `${minute} ${hour} * * *`;
+function reschedule(cfg) {
+  if (task) { task.stop(); task = null; }
+  if (!cfg.enabled) { log('[scheduler] Disabled — no cron scheduled'); return; }
+  const expr = `${cfg.cronMinute} ${cfg.cronHour} * * *`;
+  const hh = String(cfg.cronHour).padStart(2, '0');
+  const mm = String(cfg.cronMinute).padStart(2, '0');
+  log(`[scheduler] Scheduled at ${hh}:${mm} UTC daily (limit: ${cfg.dailyLimit})`);
+  task = cron.schedule(expr, async () => {
+    log(`[scheduler] Starting daily run — ${new Date().toISOString()}`);
+    try {
+      await require('./instagram').runOutreach(cfg.dailyLimit);
+    } catch (err) {
+      log(`[scheduler] Run failed: ${err.message}`);
+    }
+  });
+}
 
-console.log(`[scheduler] Agent scheduled at ${hour}:${minute.padStart(2, '0')} every day`);
-console.log(`[scheduler] Daily limit: ${dailyLimit} DMs`);
+function init() {
+  reschedule(loadConfig());
+}
 
-cron.schedule(cronExpression, async () => {
-  console.log(`\n[scheduler] Starting outreach run — ${new Date().toISOString()}`);
-  try {
-    await runOutreach(dailyLimit);
-  } catch (err) {
-    console.error('[scheduler] Run failed:', err.message);
-  }
-});
+module.exports = { reschedule, init };

@@ -1,7 +1,7 @@
 require('dotenv').config();
 const OpenAI = require('openai');
+const { log } = require('./logger');
 
-// OpenRouter exposes an OpenAI-compatible API
 const client = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
   baseURL: 'https://openrouter.ai/api/v1',
@@ -20,15 +20,15 @@ y terminar con una pregunta abierta. Sin emojis excesivos. En español.`;
 
 async function generateDM(bio) {
   const prompt = BASE_PROMPT.replace('{bio}', bio || 'emprendedor en Instagram');
-
   const response = await client.chat.completions.create({
     model: MODEL,
     messages: [{ role: 'user', content: prompt }],
     temperature: 0.85,
     max_tokens: 200,
   });
-
-  return response.choices[0].message.content.trim();
+  const text = response.choices[0].message.content.trim();
+  log(`[llm] Generated ${text.length} chars via ${MODEL}`);
+  return text;
 }
 
 module.exports = { generateDM };
