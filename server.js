@@ -7,10 +7,7 @@ const { load: loadConfig, save: saveConfig } = require('./config');
 const app = express();
 app.use(express.json());
 
-// Landing page is always public
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-
-// Auth middleware — only protects /panel and /api/*
+// Auth middleware — protects everything
 const PASS = process.env.DASHBOARD_PASSWORD;
 function requireAuth(req, res, next) {
   if (!PASS) return next();
@@ -27,8 +24,8 @@ function requireAuth(req, res, next) {
   next();
 }
 
-app.get('/panel', requireAuth, (req, res) => res.sendFile(path.join(__dirname, 'public', 'panel.html')));
-app.use('/api', requireAuth);
+app.use(requireAuth);
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'panel.html')));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ── Config ────────────────────────────────────────────────────
