@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Adrià — Emprendedor Digital</title>
+<meta name="description" content="Emprendedor digital conectando con personas que construyen algo real. Colaboraciones, alianzas y proyectos.">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --pink:#e1306c;--purple:#833ab4;--yellow:#fcaf45;
+  --bg:#07070f;--card:#111120;--border:#1e1e3a;
+  --text:#f0f0f0;--muted:#666
+}
+html{scroll-behavior:smooth}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden}
+
+/* ── Noise overlay ───────────────────── */
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:0;opacity:.5
+}
+
+/* ── Nav ─────────────────────────────── */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:20px 40px;
+  backdrop-filter:blur(12px);background:rgba(7,7,15,.7);
+  border-bottom:1px solid rgba(255,255,255,.04)
+}
+.nav-logo{
+  font-weight:800;font-size:1.1rem;letter-spacing:-.5px;
+  background:linear-gradient(90deg,var(--pink),var(--purple),var(--yellow));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent
+}
+.nav-link{
+  color:var(--muted);font-size:.85rem;text-decoration:none;
+  transition:color .2s
+}
+.nav-link:hover{color:var(--text)}
+
+/* ── Hero ────────────────────────────── */
+.hero{
+  min-height:100vh;display:flex;align-items:center;justify-content:center;
+  flex-direction:column;text-align:center;padding:120px 24px 80px;
+  position:relative;z-index:1
+}
+.glow{
+  position:absolute;top:20%;left:50%;transform:translateX(-50%);
+  width:600px;height:400px;
+  background:radial-gradient(ellipse at center,rgba(131,58,180,.2) 0%,transparent 70%);
+  pointer-events:none
+}
+.avatar{
+  width:100px;height:100px;border-radius:50%;
+  background:linear-gradient(135deg,var(--yellow),var(--pink),var(--purple));
+  display:flex;align-items:center;justify-content:center;
+  font-size:2.4rem;margin-bottom:28px;
+  box-shadow:0 0 40px rgba(225,48,108,.3)
+}
+.hero-tag{
+  display:inline-block;
+  border:1px solid var(--border);border-radius:20px;
+  padding:5px 16px;font-size:.75rem;color:var(--muted);
+  margin-bottom:20px;letter-spacing:.8px;text-transform:uppercase
+}
+.hero h1{
+  font-size:clamp(2.4rem,6vw,4.5rem);font-weight:800;
+  line-height:1.1;letter-spacing:-1.5px;margin-bottom:20px
+}
+.hero h1 em{
+  font-style:normal;
+  background:linear-gradient(90deg,var(--pink),var(--purple));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent
+}
+.hero p{
+  font-size:clamp(1rem,2vw,1.2rem);color:var(--muted);
+  max-width:520px;line-height:1.6;margin-bottom:40px
+}
+.cta-group{display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
+.btn-ig{
+  display:inline-flex;align-items:center;gap:10px;
+  padding:14px 28px;border-radius:12px;font-weight:700;font-size:.95rem;
+  text-decoration:none;transition:transform .2s,box-shadow .2s;
+  background:linear-gradient(135deg,var(--yellow),var(--pink),var(--purple));
+  color:#fff;box-shadow:0 4px 24px rgba(225,48,108,.35)
+}
+.btn-ig:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(225,48,108,.5)}
+.btn-ig svg{width:20px;height:20px;fill:#fff}
+.btn-ghost{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:14px 28px;border-radius:12px;font-weight:600;font-size:.95rem;
+  text-decoration:none;transition:border-color .2s,color .2s;
+  border:1px solid var(--border);color:var(--muted)
+}
+.btn-ghost:hover{border-color:#555;color:var(--text)}
+
+/* ── Stats strip ─────────────────────── */
+.stats-strip{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  max-width:700px;margin:60px auto 0;gap:1px;
+  background:var(--border);border:1px solid var(--border);border-radius:16px;overflow:hidden
+}
+.stat{background:var(--bg);padding:24px;text-align:center}
+.stat-n{font-size:2rem;font-weight:800;background:linear-gradient(90deg,var(--pink),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.stat-l{font-size:.75rem;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.6px}
+
+/* ── About ───────────────────────────── */
+section{padding:100px 24px;position:relative;z-index:1}
+.section-inner{max-width:1000px;margin:0 auto}
+.label{font-size:.72rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--pink);margin-bottom:14px}
+.section-title{font-size:clamp(1.8rem,4vw,2.8rem);font-weight:800;letter-spacing:-.5px;margin-bottom:20px}
+.section-sub{color:var(--muted);font-size:1rem;line-height:1.7;max-width:580px}
+
+/* ── Value cards ─────────────────────── */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:48px}
+.card{
+  background:var(--card);border:1px solid var(--border);border-radius:16px;
+  padding:28px;transition:border-color .2s,transform .2s
+}
+.card:hover{border-color:#333;transform:translateY(-3px)}
+.card-icon{font-size:1.8rem;margin-bottom:16px}
+.card h3{font-size:1rem;font-weight:700;margin-bottom:8px}
+.card p{font-size:.85rem;color:var(--muted);line-height:1.6}
+
+/* ── Process ─────────────────────────── */
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:24px;margin-top:48px;counter-reset:step}
+.step{counter-increment:step;position:relative;padding-left:56px}
+.step::before{
+  content:counter(step);
+  position:absolute;left:0;top:0;
+  width:38px;height:38px;border-radius:10px;
+  background:linear-gradient(135deg,var(--pink),var(--purple));
+  display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:.9rem;color:#fff;
+  display:flex;align-items:center;justify-content:center
+}
+.step h3{font-size:.95rem;font-weight:700;margin-bottom:8px;padding-top:6px}
+.step p{font-size:.82rem;color:var(--muted);line-height:1.6}
+
+/* ── CTA section ─────────────────────── */
+.cta-section{
+  text-align:center;background:linear-gradient(135deg,rgba(225,48,108,.08),rgba(131,58,180,.08));
+  border:1px solid var(--border);border-radius:24px;
+  padding:80px 40px;max-width:700px;margin:0 auto
+}
+.cta-section h2{font-size:clamp(1.8rem,4vw,2.5rem);font-weight:800;margin-bottom:14px}
+.cta-section p{color:var(--muted);margin-bottom:36px;font-size:1rem;line-height:1.6}
+
+/* ── Footer ──────────────────────────── */
+footer{
+  text-align:center;padding:32px;font-size:.78rem;color:#333;
+  border-top:1px solid var(--border);position:relative;z-index:1
+}
+footer a{color:#555;text-decoration:none}
+footer a:hover{color:var(--muted)}
+
+/* ── Scrollbar ───────────────────────── */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">adriiempiire</div>
+  <a href="https://instagram.com/adriiempiire" class="nav-link" target="_blank">→ Instagram</a>
+</nav>
+
+<!-- ── Hero ──────────────────────────────────────── -->
+<section class="hero">
+  <div class="glow"></div>
+  <div class="avatar">🚀</div>
+  <span class="hero-tag">Emprendedor Digital</span>
+  <h1>Construyo negocios.<br><em>Busco aliados.</em></h1>
+  <p>No creo en el networking superficial. Si estás construyendo algo real y buscas colaborar con alguien que va en serio, estamos hechos para hablar.</p>
+  <div class="cta-group">
+    <a href="https://instagram.com/adriiempiire" class="btn-ig" target="_blank">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+      Conectar en Instagram
+    </a>
+    <a href="#sobre-mi" class="btn-ghost">Saber más ↓</a>
+  </div>
+
+  <div class="stats-strip">
+    <div class="stat">
+      <div class="stat-n">100%</div>
+      <div class="stat-l">Enfoque real</div>
+    </div>
+    <div class="stat">
+      <div class="stat-n">∞</div>
+      <div class="stat-l">Ambición</div>
+    </div>
+    <div class="stat">
+      <div class="stat-n">0</div>
+      <div class="stat-l">Excusas</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Sobre mí ────────────────────────────────── -->
+<section id="sobre-mi">
+  <div class="section-inner">
+    <div class="label">Sobre mí</div>
+    <h2 class="section-title">No busco contactos.<br>Busco socios.</h2>
+    <p class="section-sub">Estoy construyendo negocios digitales desde cero y busco conectar con personas que también están en el camino — no con los que hablan de emprender, sino con los que lo hacen.</p>
+
+    <div class="cards">
+      <div class="card">
+        <div class="card-icon">🎯</div>
+        <h3>Mentalidad de resultados</h3>
+        <p>Me importan los números, las métricas y el crecimiento real. Las reuniones solo tienen sentido si llevan a algo concreto.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🤝</div>
+        <h3>Colaboraciones estratégicas</h3>
+        <p>Busco alianzas donde ambas partes ganen. Si tienes algo que ofrecer y yo también, podemos construir algo juntos.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">⚡</div>
+        <h3>Velocidad de ejecución</h3>
+        <p>De la idea a la acción rápido. No me gustan los proyectos que duermen en un doc de Google durante meses.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🌐</div>
+        <h3>Negocios digitales</h3>
+        <p>E-commerce, servicios online, automatización, contenido. El mundo digital es donde opero y donde veo las oportunidades.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Cómo trabajo ────────────────────────────── -->
+<section style="padding-top:0">
+  <div class="section-inner">
+    <div class="label">El proceso</div>
+    <h2 class="section-title">Cómo funciona<br>una colaboración conmigo</h2>
+
+    <div class="steps">
+      <div class="step">
+        <h3>Primer contacto</h3>
+        <p>Me mandas un DM en Instagram con una idea concreta. Sin rodeos, sin presentaciones de 10 párrafos.</p>
+      </div>
+      <div class="step">
+        <h3>Llamada de 20 min</h3>
+        <p>Si hay fit, hablamos. Vemos si hay algo real que construir juntos o no. Sin compromisos aún.</p>
+      </div>
+      <div class="step">
+        <h3>Propuesta clara</h3>
+        <p>Definimos qué aporta cada uno, qué esperamos y cómo medimos el éxito. Nada ambiguo.</p>
+      </div>
+      <div class="step">
+        <h3>Ejecución</h3>
+        <p>Arrancamos. Con fechas, responsables y seguimiento. El progreso se mide, no se supone.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── CTA ────────────────────────────────────── -->
+<section>
+  <div class="section-inner">
+    <div class="cta-section">
+      <h2>¿Estás construyendo algo?</h2>
+      <p>Si lees esto y sientes que encajamos, el siguiente paso es simple: mándame un mensaje en Instagram. Cuéntame qué estás haciendo en 2-3 líneas y si veo potencial, te respondo.</p>
+      <a href="https://instagram.com/adriiempiire" class="btn-ig" target="_blank" style="font-size:1rem;padding:16px 36px">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="#fff" xmlns="http://www.w3.org/2000/svg"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+        @adriiempiire — Escribir DM
+      </a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>© 2026 adriiempiire · <a href="/panel">Panel</a></p>
+</footer>
+
+</body>
+</html>
