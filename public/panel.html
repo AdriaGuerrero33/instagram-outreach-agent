@@ -3,285 +3,417 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Panel — Instagram DM Agent</title>
+<title>DM Agent — Panel profesional</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0b0b0f;color:#e8e8e8;min-height:100vh}
-header{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;background:linear-gradient(135deg,#1a1a2e,#16213e);border-bottom:1px solid #2a2a4a}
-header h1{font-size:1.1rem;font-weight:700}
-header h1 span{background:linear-gradient(90deg,#e1306c,#833ab4);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-#status-badge{display:flex;align-items:center;gap:8px;font-size:.8rem;color:#888;padding:5px 14px;border:1px solid #2a2a4a;border-radius:20px;background:#111}
-#status-dot{width:8px;height:8px;border-radius:50%;background:#4caf50;transition:background .3s}
-#status-dot.running{background:#e1306c;animation:pulse 1s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-main{display:grid;grid-template-columns:340px 1fr;gap:18px;padding:20px;max-width:1200px;margin:0 auto}
-.stats{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-.card{background:#1a1a2e;border:1px solid #2a2a4a;border-radius:12px;padding:16px 20px}
-.card-label{font-size:.7rem;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
-.card-value{font-size:1.9rem;font-weight:700;color:#fff}
-.card-value.pink{color:#e1306c}
-.card-sub{font-size:.72rem;color:#444;margin-top:4px}
-.panel{background:#1a1a2e;border:1px solid #2a2a4a;border-radius:12px;padding:20px}
-.panel h2{font-size:.8rem;text-transform:uppercase;letter-spacing:1px;color:#555;margin-bottom:16px;border-bottom:1px solid #2a2a4a;padding-bottom:10px}
-.field{margin-bottom:14px}
+:root{--bg:#0b0b0f;--card:#15151f;--card2:#1a1a28;--bd:#2a2a3e;--pink:#e1306c;--purple:#833ab4;--txt:#e8e8e8;--mut:#777}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh}
+a{color:inherit}
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;background:linear-gradient(135deg,#1a1a2e,#16213e);border-bottom:1px solid var(--bd)}
+header h1{font-size:1.05rem;font-weight:700}
+header h1 span{background:linear-gradient(90deg,var(--pink),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+#status-badge{display:flex;align-items:center;gap:8px;font-size:.78rem;color:#999;padding:5px 13px;border:1px solid var(--bd);border-radius:20px;background:#111}
+#status-dot{width:8px;height:8px;border-radius:50%;background:#4caf50}
+#status-dot.running{background:var(--pink);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+nav.tabs{display:flex;gap:4px;padding:0 24px;background:#111118;border-bottom:1px solid var(--bd);overflow-x:auto}
+.tab{padding:13px 18px;font-size:.85rem;color:var(--mut);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:.15s}
+.tab:hover{color:var(--txt)}
+.tab.active{color:#fff;border-bottom-color:var(--pink)}
+main{max-width:1240px;margin:0 auto;padding:20px}
+.view{display:none}
+.view.active{display:block}
+.grid{display:grid;gap:16px}
+.stats{grid-template-columns:repeat(5,1fr)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px 18px}
+.card-l{font-size:.68rem;color:var(--mut);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.card-v{font-size:1.7rem;font-weight:700;color:#fff}
+.card-v.pink{color:var(--pink)}
+.card-s{font-size:.7rem;color:#555;margin-top:3px}
+.panel{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:18px;margin-top:16px}
+.panel h2{font-size:.78rem;text-transform:uppercase;letter-spacing:1px;color:var(--mut);margin-bottom:14px;border-bottom:1px solid var(--bd);padding-bottom:9px;display:flex;justify-content:space-between;align-items:center}
+.field{margin-bottom:13px}
 .field label{display:block;font-size:.78rem;color:#aaa;margin-bottom:5px}
-.field input[type=number],.field textarea{width:100%;padding:9px 12px;background:#0f0f1a;border:1px solid #2a2a4a;border-radius:8px;color:#fff;font-size:.85rem;outline:none;transition:border .2s;font-family:inherit}
-.field input[type=number]:focus,.field textarea:focus{border-color:#833ab4}
-.field textarea{resize:vertical;min-height:120px;line-height:1.5}
-.field .hint{font-size:.7rem;color:#444;margin-top:4px}
-.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.time-row{display:grid;grid-template-columns:1fr 14px 1fr;gap:4px;align-items:center}
-.time-row span{text-align:center;color:#444;font-size:1.2rem;padding-top:5px}
-.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0}
-.toggle-label{font-size:.83rem;color:#aaa}
-.toggle{position:relative;width:42px;height:22px}
-.toggle input{opacity:0;width:0;height:0}
-.slider{position:absolute;inset:0;cursor:pointer;background:#2a2a4a;border-radius:22px;transition:.3s}
-.slider:before{content:'';position:absolute;width:16px;height:16px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
-.toggle input:checked+.slider{background:linear-gradient(135deg,#e1306c,#833ab4)}
-.toggle input:checked+.slider:before{transform:translateX(20px)}
-.btn{width:100%;padding:10px;border:none;border-radius:8px;cursor:pointer;font-size:.88rem;font-weight:600;transition:opacity .2s,transform .1s}
+input,textarea,select{width:100%;padding:9px 11px;background:#0f0f1a;border:1px solid var(--bd);border-radius:7px;color:#fff;font-size:.85rem;outline:none;font-family:inherit}
+input:focus,textarea:focus,select:focus{border-color:var(--purple)}
+textarea{resize:vertical;min-height:90px;line-height:1.5}
+.hint{font-size:.7rem;color:#555;margin-top:4px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn{padding:10px 14px;border:none;border-radius:7px;cursor:pointer;font-size:.85rem;font-weight:600;transition:.15s;color:#fff}
 .btn:active{transform:scale(.98)}
-.btn-run{background:linear-gradient(135deg,#e1306c,#833ab4);color:#fff;margin-bottom:9px;font-size:1rem;padding:13px}
-.btn-save{background:#1e1e3a;color:#aaa;border:1px solid #2a2a4a;margin-bottom:9px}
 .btn:disabled{opacity:.4;cursor:not-allowed}
-.leads-panel{overflow:hidden;display:flex;flex-direction:column}
-.table-wrap{overflow-y:auto;max-height:280px}
+.btn-p{background:linear-gradient(135deg,var(--pink),var(--purple));width:100%;font-size:.95rem;padding:13px}
+.btn-s{background:#22223a;border:1px solid var(--bd);color:#bbb}
+.btn-d{background:#3a1a1a;color:#f88;border:1px solid #5a2a2a}
+.sm{font-size:.75rem;padding:6px 10px}
+.toggle{position:relative;width:42px;height:22px;flex:none}
+.toggle input{opacity:0;width:0;height:0}
+.slider{position:absolute;inset:0;cursor:pointer;background:var(--bd);border-radius:22px;transition:.3s}
+.slider:before{content:'';position:absolute;width:16px;height:16px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
+.toggle input:checked+.slider{background:linear-gradient(135deg,var(--pink),var(--purple))}
+.toggle input:checked+.slider:before{transform:translateX(20px)}
+.trow{display:flex;align-items:center;justify-content:space-between;padding:9px 0}
+.days{display:flex;gap:6px;flex-wrap:wrap}
+.day{flex:1;min-width:42px;text-align:center;padding:9px 0;font-size:.78rem;border:1px solid var(--bd);border-radius:7px;cursor:pointer;color:var(--mut);user-select:none}
+.day.on{background:linear-gradient(135deg,var(--pink),var(--purple));color:#fff;border-color:transparent}
 table{width:100%;border-collapse:collapse;font-size:.8rem}
-th{position:sticky;top:0;background:#1a1a2e;color:#555;text-transform:uppercase;font-size:.68rem;letter-spacing:.8px;padding:7px 10px;text-align:left;border-bottom:1px solid #2a2a4a;z-index:1}
-td{padding:8px 10px;border-bottom:1px solid #1a1a2e;color:#ccc;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-tr:hover td{background:#1e1e32}
-.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:.68rem;font-weight:600}
-.badge.sent{background:#1a3a2a;color:#4caf50}
-.badge.skipped{background:#2a2a1a;color:#ff9800}
-.badge.error{background:#3a1a1a;color:#f44336}
-.empty-state{text-align:center;color:#333;padding:32px 0;font-size:.82rem}
-.logs-panel{grid-column:1/-1}
-.logs-panel h2{display:flex;align-items:center;justify-content:space-between}
-.logs-panel h2 button{font-size:.68rem;background:transparent;border:1px solid #2a2a4a;color:#444;padding:3px 9px;border-radius:5px;cursor:pointer}
-.logs-panel h2 button:hover{color:#aaa;border-color:#444}
-#log-box{background:#0d1117;border:1px solid #1e2430;border-radius:8px;padding:12px;font-family:Consolas,'JetBrains Mono',monospace;font-size:.73rem;line-height:1.7;color:#8b949e;height:200px;overflow-y:auto}
-.log-ts{color:#333}.log-ok{color:#3fb950}.log-warn{color:#d29922}.log-err{color:#f85149}.log-info{color:#8b949e}
-#run-msg{margin-top:10px;font-size:.76rem;color:#555;text-align:center;min-height:16px}
-.right-col{display:flex;flex-direction:column;gap:18px}
+th{position:sticky;top:0;background:var(--card2);color:var(--mut);text-transform:uppercase;font-size:.66rem;letter-spacing:.6px;padding:8px 10px;text-align:left;border-bottom:1px solid var(--bd);z-index:1}
+td{padding:8px 10px;border-bottom:1px solid #1c1c2a;color:#ccc;vertical-align:top}
+tr.lead-row{cursor:pointer}
+tr.lead-row:hover td{background:#1e1e30}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:.66rem;font-weight:600}
+.badge.sent{background:#16331f;color:#4caf50}.badge.skipped{background:#332a14;color:#ffb74d}
+.badge.error{background:#3a1818;color:#f44336}.badge.pending{background:#23233a;color:#9aa}
+.badge.rep{background:#16243a;color:#64b5f6;margin-left:5px}
+.tablewrap{overflow:auto;max-height:480px;border-radius:8px}
+.empty{text-align:center;color:#444;padding:32px;font-size:.82rem}
+.toolbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.toolbar input,.toolbar select{width:auto;flex:1;min-width:140px}
+.expand td{background:#13131e;padding:14px}
+.expand .ml{font-size:.78rem;color:#bbb;white-space:pre-wrap;background:#0d0d16;border:1px solid var(--bd);border-radius:7px;padding:10px;margin:8px 0;line-height:1.5}
+#log-box{background:#0d1117;border:1px solid #1e2430;border-radius:8px;padding:11px;font-family:Consolas,monospace;font-size:.72rem;line-height:1.65;color:#8b949e;height:240px;overflow-y:auto}
+.log-ts{color:#3a3a3a}.log-ok{color:#3fb950}.log-warn{color:#d29922}.log-err{color:#f85149}
+#run-msg{margin-top:9px;font-size:.76rem;text-align:center;min-height:15px;color:var(--mut)}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.cal .dh{text-align:center;font-size:.66rem;color:var(--mut);text-transform:uppercase;padding-bottom:4px}
+.cell{aspect-ratio:1;border:1px solid var(--bd);border-radius:7px;padding:5px;font-size:.7rem;color:#666;position:relative;cursor:default}
+.cell.has{cursor:pointer}.cell.has:hover{border-color:var(--purple)}
+.cell .dn{font-weight:600;color:#888}
+.cell .ct{position:absolute;bottom:5px;left:5px;right:5px;font-size:.62rem}
+.cell .bar{height:4px;border-radius:2px;background:var(--pink);margin-top:3px}
+.calhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.calhead button{background:#22223a;border:1px solid var(--bd);color:#bbb;border-radius:6px;padding:5px 11px;cursor:pointer}
+.rec{display:flex;align-items:center;justify-content:space-between;padding:11px;border:1px solid var(--bd);border-radius:8px;margin-bottom:9px;background:var(--card2)}
+.rec video{width:100%;border-radius:7px;margin-top:9px;background:#000}
+.ok{color:#4caf50}.no{color:#f85149}
+.banner{background:#2a1f10;border:1px solid #5a4a20;color:#e0b870;padding:11px 14px;border-radius:8px;font-size:.8rem;margin-bottom:16px;line-height:1.5}
+.cols{display:grid;grid-template-columns:340px 1fr;gap:16px;align-items:start}
+@media(max-width:900px){.cols{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
 <header>
-  <h1>📲 <span>DM Agent</span> — Panel de control</h1>
-  <div id="status-badge">
-    <div id="status-dot"></div>
-    <span id="status-text">Idle</span>
-  </div>
+  <h1>📲 <span>DM Agent</span> — Panel profesional</h1>
+  <div id="status-badge"><div id="status-dot"></div><span id="status-text">Idle</span></div>
 </header>
 
+<nav class="tabs">
+  <div class="tab active" data-v="dash">Dashboard</div>
+  <div class="tab" data-v="crm">CRM</div>
+  <div class="tab" data-v="cal">Calendario</div>
+  <div class="tab" data-v="rec">Grabaciones</div>
+  <div class="tab" data-v="cfg">Configuración</div>
+  <div class="tab" data-v="ses">Sesión IG</div>
+</nav>
+
 <main>
-  <!-- Stats -->
-  <div class="stats">
-    <div class="card"><div class="card-label">Total leads</div><div class="card-value" id="stat-total">—</div><div class="card-sub" id="stat-sent-sub"></div></div>
-    <div class="card"><div class="card-label">Enviados hoy</div><div class="card-value pink" id="stat-today">—</div><div class="card-sub" id="stat-today-sub"></div></div>
-    <div class="card"><div class="card-label">Total enviados</div><div class="card-value" id="stat-sent">—</div><div class="card-sub">acumulado</div></div>
-    <div class="card"><div class="card-label">Última ejecución</div><div class="card-value" style="font-size:.9rem;padding-top:6px" id="stat-last">—</div><div class="card-sub" id="stat-next">—</div></div>
-  </div>
-
-  <!-- Left: config panel -->
-  <div class="panel" style="align-self:start">
-    <h2>Configuración</h2>
-
-    <!-- Run now -->
-    <button class="btn btn-run" id="btn-run" onclick="runNow()">▶ Enviar ahora</button>
-    <div id="run-msg"></div>
-
-    <div style="border-top:1px solid #2a2a4a;margin:16px 0"></div>
-
-    <!-- Schedule -->
-    <div class="field">
-      <label>Hora de envío automático (UTC)</label>
-      <div class="time-row">
-        <input type="number" id="cfg-hour" min="0" max="23" placeholder="HH">
-        <span>:</span>
-        <input type="number" id="cfg-minute" min="0" max="59" placeholder="MM">
+  <!-- ───────── DASHBOARD ───────── -->
+  <section class="view active" id="v-dash">
+    <div class="grid stats">
+      <div class="card"><div class="card-l">Total leads</div><div class="card-v" id="s-total">—</div><div class="card-s">en el CRM</div></div>
+      <div class="card"><div class="card-l">Enviados hoy</div><div class="card-v pink" id="s-today">—</div><div class="card-s" id="s-today-s"></div></div>
+      <div class="card"><div class="card-l">Total enviados</div><div class="card-v" id="s-sent">—</div><div class="card-s">acumulado</div></div>
+      <div class="card"><div class="card-l">Respondieron</div><div class="card-v" id="s-rep">—</div><div class="card-s" id="s-rate"></div></div>
+      <div class="card"><div class="card-l">Próxima ejecución</div><div class="card-v" style="font-size:.95rem;padding-top:7px" id="s-next">—</div><div class="card-s" id="s-last"></div></div>
+    </div>
+    <div class="cols" style="margin-top:16px">
+      <div class="panel" style="margin-top:0">
+        <h2>Control</h2>
+        <button class="btn btn-p" id="btn-run" onclick="runNow()">▶ Enviar ahora</button>
+        <div id="run-msg"></div>
+      </div>
+      <div>
+        <div class="panel" style="margin-top:0">
+          <h2>Vista en vivo del agente</h2>
+          <div style="position:relative;background:#000;border-radius:8px;overflow:hidden;min-height:200px">
+            <img id="shot" src="" style="width:100%;display:none;border-radius:8px">
+            <div id="shot-off" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#333;font-size:.8rem">Sin captura — pulsa "Enviar ahora"</div>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Logs en tiempo real <button class="btn btn-s sm" onclick="document.getElementById('log-box').innerHTML=''">Limpiar</button></h2>
+          <div id="log-box"></div>
+        </div>
       </div>
     </div>
+  </section>
 
-    <!-- Daily limit -->
-    <div class="field">
-      <label>Límite diario de DMs</label>
-      <input type="number" id="cfg-limit" min="1" max="50">
-    </div>
-
-    <!-- Intervals -->
-    <div class="field">
-      <label>Intervalo entre DMs (minutos)</label>
-      <div class="row2">
-        <input type="number" id="cfg-intmin" min="1" max="60" placeholder="Mín">
-        <input type="number" id="cfg-intmax" min="1" max="120" placeholder="Máx">
+  <!-- ───────── CRM ───────── -->
+  <section class="view" id="v-crm">
+    <div class="panel" style="margin-top:0">
+      <h2>CRM — Cuentas contactadas <a class="btn btn-s sm" href="/api/leads.csv">⬇ Exportar CSV</a></h2>
+      <div class="toolbar">
+        <input id="crm-q" placeholder="Buscar usuario, bio o nota..." oninput="loadCRM()">
+        <select id="crm-status" onchange="loadCRM()">
+          <option value="all">Todos los estados</option>
+          <option value="sent">Enviados</option>
+          <option value="skipped">Omitidos</option>
+          <option value="error">Errores</option>
+        </select>
       </div>
-      <div class="hint">Espera aleatoria entre mensajes para parecer humano</div>
-    </div>
-
-    <!-- Enabled toggle -->
-    <div class="toggle-row">
-      <span class="toggle-label">Agente activo</span>
-      <label class="toggle"><input type="checkbox" id="cfg-enabled" checked><span class="slider"></span></label>
-    </div>
-
-    <!-- DM prompt -->
-    <div class="field" style="margin-top:6px">
-      <label>Plantilla del DM <span style="color:#444;font-weight:400">(usa {bio})</span></label>
-      <textarea id="cfg-prompt"></textarea>
-      <div class="hint">"{bio}" se reemplaza con la bio de cada perfil automáticamente</div>
-    </div>
-
-    <button class="btn btn-save" id="btn-save" onclick="saveConfig()">Guardar cambios</button>
-  </div>
-
-  <!-- Right: leads + logs -->
-  <div class="right-col">
-    <div class="panel leads-panel">
-      <h2>Leads contactados</h2>
-      <div class="table-wrap">
+      <div class="tablewrap">
         <table>
-          <thead><tr><th>Usuario</th><th>Bio</th><th>Estado</th><th>Fecha</th></tr></thead>
-          <tbody id="leads-body"><tr><td colspan="4" class="empty-state">Cargando...</td></tr></tbody>
+          <thead><tr><th>Usuario</th><th>Bio</th><th>Estado</th><th>Resp.</th><th>Fecha</th></tr></thead>
+          <tbody id="crm-body"><tr><td colspan="5" class="empty">Cargando...</td></tr></tbody>
         </table>
       </div>
     </div>
+  </section>
 
-    <!-- Live browser view -->
-    <div class="panel" id="browser-panel" style="display:none">
-      <h2>Vista en vivo del agente</h2>
-      <div style="position:relative;background:#000;border-radius:8px;overflow:hidden;min-height:180px">
-        <img id="browser-img" src="" alt="screenshot" style="width:100%;display:block;border-radius:8px">
-        <div id="browser-offline" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#333;font-size:.8rem">Sin actividad</div>
+  <!-- ───────── CALENDARIO ───────── -->
+  <section class="view" id="v-cal">
+    <div class="panel" style="margin-top:0">
+      <div class="calhead">
+        <button onclick="calMove(-1)">‹ Anterior</button>
+        <strong id="cal-title">—</strong>
+        <button onclick="calMove(1)">Siguiente ›</button>
       </div>
-      <div style="font-size:.68rem;color:#333;margin-top:6px;text-align:center">Se actualiza cada 3 segundos mientras el agente está activo</div>
+      <div class="cal" id="cal-grid"></div>
+      <div id="cal-detail" style="margin-top:16px"></div>
     </div>
+  </section>
 
-    <div class="panel logs-panel">
-      <h2>Logs en tiempo real <button onclick="document.getElementById('log-box').innerHTML=''">Limpiar</button></h2>
-      <div id="log-box"></div>
+  <!-- ───────── GRABACIONES ───────── -->
+  <section class="view" id="v-rec">
+    <div class="panel" style="margin-top:0">
+      <h2>Grabaciones de sesiones <button class="btn btn-s sm" onclick="loadRecs()">↻ Refrescar</button></h2>
+      <div id="rec-list"><div class="empty">Cargando...</div></div>
     </div>
-  </div>
+  </section>
+
+  <!-- ───────── CONFIGURACIÓN ───────── -->
+  <section class="view" id="v-cfg">
+    <div class="panel" style="margin-top:0">
+      <h2>Programación y comportamiento</h2>
+      <div class="field">
+        <label>Hora de envío automático (UTC)</label>
+        <div class="row"><input type="number" id="c-h" min="0" max="23"><input type="number" id="c-m" min="0" max="59"></div>
+      </div>
+      <div class="field">
+        <label>Días de la semana que trabaja el bot</label>
+        <div class="days" id="c-days"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Límite diario de DMs</label><input type="number" id="c-lim" min="1" max="80"></div>
+        <div class="field"><label>Intervalo min/max (min)</label><div class="row"><input type="number" id="c-imin" min="1"><input type="number" id="c-imax" min="1"></div></div>
+      </div>
+      <div class="trow"><span>Agente activo (programación)</span><label class="toggle"><input type="checkbox" id="c-en"><span class="slider"></span></label></div>
+      <div class="trow"><span>Grabar vídeo de cada sesión</span><label class="toggle"><input type="checkbox" id="c-rec"><span class="slider"></span></label></div>
+      <div class="field" style="margin-top:10px">
+        <label>Plantilla del DM <span style="color:#555">(usa {bio})</span> <a style="color:#666;cursor:pointer;font-size:.72rem" onclick="resetPrompt()">restaurar por defecto</a></label>
+        <textarea id="c-prompt" style="min-height:140px"></textarea>
+        <div class="hint">"{bio}" se reemplaza con la bio de cada perfil automáticamente</div>
+      </div>
+      <button class="btn btn-p" onclick="saveCfg()" id="btn-save">Guardar cambios</button>
+      <div id="cfg-msg" style="text-align:center;font-size:.76rem;color:var(--mut);margin-top:9px;min-height:14px"></div>
+    </div>
+  </section>
+
+  <!-- ───────── SESIÓN IG ───────── -->
+  <section class="view" id="v-ses">
+    <div class="panel" style="margin-top:0">
+      <h2>Sesión de Instagram</h2>
+      <div class="banner">
+        <strong>⚠ Importante:</strong> Instagram bloquea logins automáticos desde servidores (la IP de Railway).
+        La forma fiable de que funcione es subir aquí tu sesión:
+        <br>1. Entra a instagram.com en tu navegador (ya logueado).
+        <br>2. Instala la extensión <b>Cookie-Editor</b> (Chrome/Firefox).
+        <br>3. Ábrela en instagram.com → <b>Export</b> → <b>JSON</b> → copia.
+        <br>4. Pega el JSON aquí abajo y pulsa Guardar.
+      </div>
+      <div class="trow" style="border-bottom:1px solid var(--bd);padding-bottom:14px;margin-bottom:14px">
+        <span>Estado de la sesión</span>
+        <strong id="ses-state">—</strong>
+      </div>
+      <div class="field">
+        <label>Pega el JSON de cookies exportado</label>
+        <textarea id="ses-json" style="min-height:160px" placeholder='[{"name":"sessionid","value":"...","domain":".instagram.com",...}]'></textarea>
+      </div>
+      <div class="row">
+        <button class="btn btn-p" onclick="saveSession()">Guardar sesión</button>
+        <button class="btn btn-d" onclick="clearSession()">Borrar sesión</button>
+      </div>
+      <div id="ses-msg" style="text-align:center;font-size:.78rem;margin-top:10px;min-height:15px"></div>
+    </div>
+  </section>
 </main>
 
 <script>
+const $=id=>document.getElementById(id);
+const DAYS=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+const MONTHS=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 function fmt(iso){if(!iso)return'—';const d=new Date(iso);return d.toLocaleDateString('es-ES',{day:'2-digit',month:'short'})+' '+d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}
-function nextRun(h,m){const now=new Date(),next=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate(),h,m));if(next<=now)next.setUTCDate(next.getUTCDate()+1);const diff=next-now,hh=Math.floor(diff/3600000),mm=Math.floor((diff%3600000)/60000);return`Próxima en ${hh}h ${mm}m`}
-function logClass(m){if(/error|fatal|failed/i.test(m))return'log-err';if(/warn|skip/i.test(m))return'log-warn';if(/sent|success|saved|login successful/i.test(m))return'log-ok';return'log-info'}
+function nextRun(h,m,days){const now=new Date();for(let i=0;i<8;i++){const c=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()+i,h,m));if(c>now&&days.includes(c.getUTCDay()))return'Próx: '+DAYS[c.getUTCDay()]+' '+c.toLocaleDateString('es-ES',{day:'2-digit',month:'short'})}return'Sin días programados'}
+function logClass(m){if(/error|fatal|fall|bloque/i.test(m))return'log-err';if(/warn|omit|caduc/i.test(m))return'log-warn';if(/envia|correct|guardad|válida/i.test(m))return'log-ok';return''}
 
+// Tabs
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active');$('v-'+t.dataset.v).classList.add('active');
+  if(t.dataset.v==='crm')loadCRM();
+  if(t.dataset.v==='cal')renderCal();
+  if(t.dataset.v==='rec')loadRecs();
+  if(t.dataset.v==='ses')loadSession();
+});
+
+// Dashboard
 async function loadStats(){
   const[s,cfg]=await Promise.all([fetch('/api/stats').then(r=>r.json()),fetch('/api/config').then(r=>r.json())]);
-  document.getElementById('stat-total').textContent=s.total;
-  document.getElementById('stat-sent-sub').textContent='leads totales';
-  document.getElementById('stat-today').textContent=s.today;
-  document.getElementById('stat-today-sub').textContent='de '+cfg.dailyLimit+' límite';
-  document.getElementById('stat-sent').textContent=s.sent;
-  document.getElementById('stat-last').textContent=fmt(s.lastRun);
-  document.getElementById('stat-next').textContent=cfg.enabled?nextRun(cfg.cronHour,cfg.cronMinute):'Agente desactivado';
+  $('s-total').textContent=s.total;$('s-today').textContent=s.today;
+  $('s-today-s').textContent='de '+cfg.dailyLimit+' límite';
+  $('s-sent').textContent=s.sent;$('s-rep').textContent=s.replied;
+  $('s-rate').textContent=s.replyRate+'% respuesta';
+  $('s-next').textContent=cfg.enabled?nextRun(cfg.cronHour,cfg.cronMinute,cfg.days):'Desactivado';
+  $('s-last').textContent='Últ: '+fmt(s.lastRun);
+}
+async function runNow(){
+  const b=$('btn-run'),m=$('run-msg');b.disabled=true;
+  const r=await fetch('/api/run',{method:'POST'});
+  if(r.status===409){m.textContent='Ya está en ejecución.';m.style.color='#ffb74d'}
+  else{m.textContent='Iniciado. Mira la vista en vivo y los logs.';m.style.color='#4caf50'}
+  setTimeout(()=>{b.disabled=false;m.textContent=''},4000);
+}
+const dot=$('status-dot'),stx=$('status-text'),rbtn=$('btn-run'),shot=$('shot'),shotOff=$('shot-off');
+async function refreshShot(){
+  try{const r=await fetch('/api/screenshot',{cache:'no-store'});
+    if(r.status===204||!r.ok){shot.style.display='none';shotOff.style.display='flex'}
+    else{const b=await r.blob(),u=URL.createObjectURL(b),o=shot.src;shot.src=u;shot.style.display='block';shotOff.style.display='none';if(o.startsWith('blob:'))URL.revokeObjectURL(o)}
+  }catch{}
+}
+let shotTimer=null;
+async function pollStatus(){
+  const{running}=await fetch('/api/status').then(r=>r.json());
+  dot.className=running?'running':'';stx.textContent=running?'Ejecutando...':'Idle';
+  rbtn.textContent=running?'⏳ En ejecución':'▶ Enviar ahora';
+  clearInterval(shotTimer);shotTimer=setInterval(refreshShot,running?3000:12000);
+}
+const lbox=$('log-box');let autoS=true;
+lbox.addEventListener('scroll',()=>autoS=lbox.scrollTop+lbox.clientHeight>=lbox.scrollHeight-20);
+function appendLog(e){const d=document.createElement('div');d.innerHTML=`<span class="log-ts">${e.ts.slice(11,19)}</span> <span class="${logClass(e.msg)}">${e.msg.replace(/</g,'&lt;')}</span>`;lbox.appendChild(d);if(autoS)lbox.scrollTop=lbox.scrollHeight}
+new EventSource('/api/logs').onmessage=e=>appendLog(JSON.parse(e.data));
+
+// CRM
+async function loadCRM(){
+  const q=$('crm-q').value,st=$('crm-status').value;
+  const leads=await fetch(`/api/leads?q=${encodeURIComponent(q)}&status=${st}`).then(r=>r.json());
+  const tb=$('crm-body');
+  if(!leads.length){tb.innerHTML='<tr><td colspan="5" class="empty">Sin resultados</td></tr>';return}
+  tb.innerHTML=leads.map(l=>`
+    <tr class="lead-row" onclick="toggleLead('${l.id}')">
+      <td><a href="https://instagram.com/${l.username}" target="_blank" onclick="event.stopPropagation()">@${l.username}</a></td>
+      <td title="${(l.bio||'').replace(/"/g,'&quot;')}">${(l.bio||'—').slice(0,45)}</td>
+      <td><span class="badge ${l.status}">${l.status}</span></td>
+      <td>${l.replied?'<span class="badge rep">sí</span>':'—'}</td>
+      <td>${fmt(l.timestamp)}</td>
+    </tr>
+    <tr id="ex-${l.id}" style="display:none"><td colspan="5" class="expand">
+      <div><b>Mensaje enviado:</b></div>
+      <div class="ml">${(l.message||'(sin mensaje)').replace(/</g,'&lt;')}</div>
+      <div class="field"><label>Notas internas</label><textarea id="n-${l.id}">${(l.notes||'').replace(/</g,'&lt;')}</textarea></div>
+      <div class="row" style="grid-template-columns:auto auto 1fr;gap:8px;align-items:center">
+        <button class="btn btn-s sm" onclick="saveNote('${l.id}')">Guardar nota</button>
+        <button class="btn btn-s sm" onclick="toggleReplied('${l.id}',${!l.replied})">${l.replied?'Marcar NO respondido':'Marcar respondido ✓'}</button>
+        <span id="lm-${l.id}" style="font-size:.74rem;color:var(--mut)"></span>
+      </div>
+    </td></tr>`).join('');
+}
+function toggleLead(id){const e=$('ex-'+id);e.style.display=e.style.display==='none'?'':'none'}
+async function saveNote(id){
+  await fetch('/api/leads/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({notes:$('n-'+id).value})});
+  $('lm-'+id).textContent='Nota guardada ✓';setTimeout(()=>$('lm-'+id).textContent='',2000);
+}
+async function toggleReplied(id,v){
+  await fetch('/api/leads/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({replied:v})});
+  loadCRM();loadStats();
 }
 
-async function loadConfig(){
-  const cfg=await fetch('/api/config').then(r=>r.json());
-  document.getElementById('cfg-hour').value=cfg.cronHour;
-  document.getElementById('cfg-minute').value=String(cfg.cronMinute).padStart(2,'0');
-  document.getElementById('cfg-limit').value=cfg.dailyLimit;
-  document.getElementById('cfg-intmin').value=cfg.intervalMin??3;
-  document.getElementById('cfg-intmax').value=cfg.intervalMax??8;
-  document.getElementById('cfg-enabled').checked=cfg.enabled;
-  document.getElementById('cfg-prompt').value=cfg.dmPrompt||'';
+// Calendario
+let calRef=new Date();
+async function renderCal(){
+  const data=await fetch('/api/calendar').then(r=>r.json());
+  const y=calRef.getFullYear(),mo=calRef.getMonth();
+  $('cal-title').textContent=MONTHS[mo]+' '+y;
+  const first=new Date(y,mo,1),start=(first.getDay()+6)%7,dim=new Date(y,mo+1,0).getDate();
+  let max=1;Object.values(data).forEach(d=>{if(d.sent>max)max=d.sent});
+  let h=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d=>`<div class="dh">${d}</div>`).join('');
+  for(let i=0;i<start;i++)h+='<div></div>';
+  for(let d=1;d<=dim;d++){
+    const key=`${y}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const e=data[key];
+    h+=`<div class="cell ${e?'has':''}" ${e?`onclick="calDay('${key}')"`:''}>
+      <div class="dn">${d}</div>
+      ${e?`<div class="ct"><span class="ok">${e.sent}✓</span> ${e.error?`<span class="no">${e.error}✕</span>`:''}<div class="bar" style="width:${Math.round(e.sent/max*100)}%"></div></div>`:''}
+    </div>`;
+  }
+  $('cal-grid').innerHTML=h;$('cal-detail').innerHTML='';
+}
+function calMove(n){calRef.setMonth(calRef.getMonth()+n);renderCal()}
+async function calDay(key){
+  const leads=(await fetch('/api/leads?status=all').then(r=>r.json())).filter(l=>(l.timestamp||'').slice(0,10)===key);
+  $('cal-detail').innerHTML=`<h2 style="font-size:.78rem;color:var(--mut);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Actividad del ${key} — ${leads.length} acciones</h2>`+
+   `<div class="tablewrap"><table><thead><tr><th>Usuario</th><th>Estado</th><th>Hora</th></tr></thead><tbody>`+
+   leads.map(l=>`<tr><td>@${l.username}</td><td><span class="badge ${l.status}">${l.status}</span></td><td>${new Date(l.timestamp).toLocaleTimeString('es-ES')}</td></tr>`).join('')+
+   `</tbody></table></div>`;
 }
 
-async function saveConfig(){
-  const btn=document.getElementById('btn-save');
-  btn.disabled=true;btn.textContent='Guardando...';
+// Grabaciones
+async function loadRecs(){
+  const recs=await fetch('/api/recordings').then(r=>r.json());
+  const el=$('rec-list');
+  if(!recs.length){el.innerHTML='<div class="empty">Aún no hay grabaciones. Se crean al ejecutar el agente (si está activada la opción en Configuración).</div>';return}
+  el.innerHTML=recs.map(r=>`<div class="rec">
+    <div><b style="font-size:.82rem">${r.name}</b><div style="font-size:.72rem;color:var(--mut)">${(r.size/1048576).toFixed(1)} MB</div></div>
+    <div><button class="btn btn-s sm" onclick="this.closest('.rec').querySelector('video').style.display='block';this.style.display='none'">▶ Ver</button>
+    <a class="btn btn-s sm" href="${r.url}" download>⬇ Descargar</a></div>
+    <video controls preload="none" src="${r.url}" style="display:none;flex-basis:100%"></video>
+  </div>`).join('');
+}
+
+// Config
+let cfgCache={};
+async function loadCfg(){
+  const c=await fetch('/api/config').then(r=>r.json());cfgCache=c;
+  $('c-h').value=c.cronHour;$('c-m').value=String(c.cronMinute).padStart(2,'0');
+  $('c-lim').value=c.dailyLimit;$('c-imin').value=c.intervalMin;$('c-imax').value=c.intervalMax;
+  $('c-en').checked=c.enabled;$('c-rec').checked=c.recordVideo;$('c-prompt').value=c.dmPrompt||'';
+  $('c-days').innerHTML=DAYS.map((d,i)=>`<div class="day ${c.days.includes(i)?'on':''}" data-d="${i}" onclick="this.classList.toggle('on')">${d}</div>`).join('');
+}
+function resetPrompt(){$('c-prompt').value=cfgCache.defaultPrompt||''}
+async function saveCfg(){
+  const b=$('btn-save');b.disabled=true;b.textContent='Guardando...';
+  const days=[...document.querySelectorAll('#c-days .day.on')].map(e=>+e.dataset.d);
   await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-    cronHour:parseInt(document.getElementById('cfg-hour').value),
-    cronMinute:parseInt(document.getElementById('cfg-minute').value),
-    dailyLimit:parseInt(document.getElementById('cfg-limit').value),
-    intervalMin:parseInt(document.getElementById('cfg-intmin').value),
-    intervalMax:parseInt(document.getElementById('cfg-intmax').value),
-    enabled:document.getElementById('cfg-enabled').checked,
-    dmPrompt:document.getElementById('cfg-prompt').value,
+    cronHour:+$('c-h').value,cronMinute:+$('c-m').value,dailyLimit:+$('c-lim').value,
+    intervalMin:+$('c-imin').value,intervalMax:+$('c-imax').value,days,
+    enabled:$('c-en').checked,recordVideo:$('c-rec').checked,dmPrompt:$('c-prompt').value
   })});
-  btn.textContent='✓ Guardado';setTimeout(()=>{btn.textContent='Guardar cambios';btn.disabled=false},2000);
+  b.textContent='✓ Guardado';$('cfg-msg').textContent='Configuración aplicada';
+  setTimeout(()=>{b.textContent='Guardar cambios';b.disabled=false;$('cfg-msg').textContent=''},2200);
   loadStats();
 }
 
-async function runNow(){
-  const btn=document.getElementById('btn-run'),msg=document.getElementById('run-msg');
-  btn.disabled=true;
-  const res=await fetch('/api/run',{method:'POST'});
-  if(res.status===409){msg.textContent='Ya está en ejecución.';msg.style.color='#ff9800';}
-  else{msg.textContent='Iniciado. Revisa los logs.';msg.style.color='#4caf50';}
-  setTimeout(()=>{btn.disabled=false;msg.textContent=''},3000);
+// Sesión
+async function loadSession(){
+  const s=await fetch('/api/session').then(r=>r.json());
+  $('ses-state').innerHTML=s.active?'<span class="ok">● Activa</span>':'<span class="no">● Sin sesión</span>';
+}
+async function saveSession(){
+  const m=$('ses-msg');
+  const r=await fetch('/api/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cookies:$('ses-json').value})});
+  const d=await r.json();
+  if(r.ok){m.style.color='#4caf50';m.textContent=`Sesión guardada (${d.count} cookies) ✓`;$('ses-json').value='';loadSession()}
+  else{m.style.color='#f85149';m.textContent=d.error||'Error'}
+}
+async function clearSession(){
+  if(!confirm('¿Borrar la sesión guardada?'))return;
+  await fetch('/api/session',{method:'DELETE'});loadSession();
+  $('ses-msg').style.color='#ffb74d';$('ses-msg').textContent='Sesión borrada';
 }
 
-async function loadLeads(){
-  const leads=await fetch('/api/leads').then(r=>r.json());
-  const tbody=document.getElementById('leads-body');
-  if(!leads.length){tbody.innerHTML='<tr><td colspan="4" class="empty-state">Sin leads aún</td></tr>';return;}
-  tbody.innerHTML=leads.map(l=>`<tr><td>@${l.username}</td><td title="${l.bio||''}">${(l.bio||'—').slice(0,35)}</td><td><span class="badge ${l.status}">${l.status}</span></td><td>${fmt(l.timestamp)}</td></tr>`).join('');
-}
-
-const logBox=document.getElementById('log-box');
-let autoScroll=true;
-logBox.addEventListener('scroll',()=>{autoScroll=logBox.scrollTop+logBox.clientHeight>=logBox.scrollHeight-20});
-function appendLog(e){const d=document.createElement('div');d.innerHTML=`<span class="log-ts">${e.ts.slice(11,19)}</span>  <span class="${logClass(e.msg)}">${e.msg}</span>`;logBox.appendChild(d);if(autoScroll)logBox.scrollTop=logBox.scrollHeight}
-
-new EventSource('/api/logs').onmessage=e=>appendLog(JSON.parse(e.data));
-
-const dot=document.getElementById('status-dot'),stText=document.getElementById('status-text'),runBtn=document.getElementById('btn-run');
-
-// Screenshot live view
-const browserPanel=document.getElementById('browser-panel');
-const browserImg=document.getElementById('browser-img');
-const browserOffline=document.getElementById('browser-offline');
-let screenshotInterval=null;
-
-async function refreshScreenshot(){
-  try{
-    const r=await fetch('/api/screenshot',{cache:'no-store'});
-    if(r.status===204||!r.ok){
-      browserImg.style.display='none';
-      browserOffline.style.display='flex';
-    } else {
-      const blob=await r.blob();
-      const url=URL.createObjectURL(blob);
-      const old=browserImg.src;
-      browserImg.src=url;
-      browserImg.style.display='block';
-      browserOffline.style.display='none';
-      if(old.startsWith('blob:'))URL.revokeObjectURL(old);
-    }
-  }catch{}
-}
-
-function startScreenshots(){
-  browserPanel.style.display='';
-  if(!screenshotInterval){
-    refreshScreenshot();
-    screenshotInterval=setInterval(refreshScreenshot,3000);
-  }
-}
-function stopScreenshots(){
-  clearInterval(screenshotInterval);
-  screenshotInterval=null;
-  browserImg.style.display='none';
-  browserOffline.style.display='flex';
-}
-
-async function pollStatus(){
-  const{running}=await fetch('/api/status').then(r=>r.json());
-  dot.className=running?'running':'';
-  stText.textContent=running?'Ejecutando...':'Idle';
-  runBtn.textContent=running?'⏳ En ejecución':'▶ Enviar ahora';
-  if(running) startScreenshots(); else stopScreenshots();
-}
-
-loadConfig();loadStats();loadLeads();pollStatus();
+loadStats();loadCfg();pollStatus();refreshShot();
 setInterval(pollStatus,4000);
-setInterval(()=>{loadStats();loadLeads()},15000);
+setInterval(loadStats,15000);
 </script>
 </body>
 </html>

@@ -1,10 +1,11 @@
 require('dotenv').config();
 
-const required = ['INSTAGRAM_USER', 'INSTAGRAM_PASS', 'OPENROUTER_API_KEY'];
-const missing = required.filter((k) => !process.env[k]);
-if (missing.length) {
-  console.error(`[config] Missing env vars: ${missing.join(', ')}`);
+if (!process.env.OPENROUTER_API_KEY) {
+  console.error('[config] Falta OPENROUTER_API_KEY');
   process.exit(1);
+}
+if (!process.env.INSTAGRAM_USER || !process.env.INSTAGRAM_PASS) {
+  console.warn('[config] Sin INSTAGRAM_USER/PASS — usa la subida de sesión (cookies) desde el panel');
 }
 
 require('./server').start();

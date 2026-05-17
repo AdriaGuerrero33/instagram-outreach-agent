@@ -1,7 +1,7 @@
 {
   "name": "instagram-outreach-agent",
-  "version": "2.0.0",
-  "description": "Instagram DM outreach agent with web dashboard — Playwright + OpenRouter Owl Alpha",
+  "version": "3.0.0",
+  "description": "Instagram DM outreach agent — CRM, calendario, grabaciones y panel profesional",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -9,6 +9,8 @@
   },
   "dependencies": {
     "playwright": "latest",
+    "playwright-extra": "latest",
+    "puppeteer-extra-plugin-stealth": "latest",
     "openai": "latest",
     "node-cron": "latest",
     "dotenv": "latest",

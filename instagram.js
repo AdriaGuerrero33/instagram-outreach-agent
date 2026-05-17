@@ -1,56 +1,38 @@
 require('dotenv').config();
-const { chromium } = require('playwright');
+const { chromium } = require('playwright-extra');
+const stealth = require('puppeteer-extra-plugin-stealth')();
+chromium.use(stealth);
+
 const fs = require('fs');
 const path = require('path');
 const { log } = require('./logger');
+const store = require('./storage');
+const { load: loadConfig } = require('./config');
 
-const SESSION_FILE    = path.join(__dirname, 'session.json');
-const LEADS_FILE      = path.join(__dirname, 'leads.json');
 const SCREENSHOT_FILE = path.join(__dirname, 'public', 'screenshot.png');
+const RECORDINGS_DIR  = path.join(__dirname, 'public', 'recordings');
+if (!fs.existsSync(RECORDINGS_DIR)) fs.mkdirSync(RECORDINGS_DIR, { recursive: true });
 
 const USER_AGENT =
-  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
-// Shared page reference so server can grab screenshots on demand
 let _activePage = null;
 function getActivePage() { return _activePage; }
 
-function randomInt(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-async function randomDelay(min = 500, max = 2000) {
-  await sleep(randomInt(min, max));
-}
+const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const randomDelay = (min = 500, max = 2000) => sleep(randomInt(min, max));
+
 async function humanType(page, selector, text) {
   await page.click(selector);
-  for (const char of text) {
-    await page.keyboard.type(char, { delay: randomInt(80, 200) });
-  }
+  for (const ch of text) await page.keyboard.type(ch, { delay: randomInt(80, 200) });
 }
 async function smoothScroll(page, distance = 300) {
   await page.evaluate((d) => window.scrollBy({ top: d, behavior: 'smooth' }), distance);
   await sleep(randomInt(400, 800));
 }
-
-// Save a screenshot to public/screenshot.png for the live view
 async function snap(page) {
-  try {
-    await page.screenshot({ path: SCREENSHOT_FILE, type: 'png' });
-  } catch {}
-}
-
-function loadLeads() {
-  if (!fs.existsSync(LEADS_FILE)) return [];
-  try { return JSON.parse(fs.readFileSync(LEADS_FILE, 'utf8')); }
-  catch { return []; }
-}
-function appendLead(lead) {
-  const leads = loadLeads();
-  leads.push(lead);
-  fs.writeFileSync(LEADS_FILE, JSON.stringify(leads, null, 2));
+  try { await page.screenshot({ path: SCREENSHOT_FILE, type: 'png' }); } catch {}
 }
 
 async function launchBrowser() {
@@ -61,29 +43,33 @@ async function launchBrowser() {
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-blink-features=AutomationControlled',
+      '--lang=es-ES',
     ],
   });
 }
 
-async function loadSession(context) {
-  if (fs.existsSync(SESSION_FILE)) {
-    const cookies = JSON.parse(fs.readFileSync(SESSION_FILE, 'utf8'));
+async function applySession(context) {
+  const cookies = store.loadSessionCookies();
+  if (cookies && Array.isArray(cookies) && cookies.length) {
     await context.addCookies(cookies);
-    log('[session] Cookies loaded from session.json');
+    log('[sesión] Cookies de Instagram cargadas');
     return true;
   }
   return false;
 }
-async function saveSession(context) {
-  const cookies = await context.cookies();
-  fs.writeFileSync(SESSION_FILE, JSON.stringify(cookies, null, 2));
-  log('[session] session.json saved');
+async function persistSession(context) {
+  try {
+    const cookies = await context.cookies();
+    store.saveSessionCookies(cookies);
+    log('[sesión] Sesión guardada');
+  } catch {}
 }
 
-// Dismiss cookie/consent dialogs Instagram shows in EU
 async function dismissCookies(page) {
   try {
-    const btn = await page.$('button:has-text("Allow all cookies"), button:has-text("Accept All"), button:has-text("Aceptar todo")');
+    const btn = await page.$(
+      'button:has-text("Allow all cookies"), button:has-text("Accept All"), button:has-text("Aceptar todo"), button:has-text("Permitir todas")'
+    );
     if (btn) { await btn.click(); await randomDelay(800, 1500); }
   } catch {}
 }
@@ -94,75 +80,62 @@ async function isLoggedIn(page) {
     await dismissCookies(page);
     await randomDelay(1500, 2500);
     await snap(page);
-    // Logged in if no login form visible
     const loginInput = await page.$('input[name="username"]');
     return !loginInput && page.url().includes('instagram.com');
   } catch { return false; }
 }
 
 async function login(page, context) {
-  log('[login] Navigating to login page...');
+  log('[login] Abriendo página de login...');
   await page.goto('https://www.instagram.com/accounts/login/', { waitUntil: 'domcontentloaded', timeout: 30000 });
   await randomDelay(1500, 3000);
   await dismissCookies(page);
   await randomDelay(500, 1000);
   await snap(page);
 
-  // Wait up to 10s for the login form
-  let usernameField = null;
-  try {
-    usernameField = await page.waitForSelector('input[name="username"]', { timeout: 10000 });
-  } catch {}
+  let userField = null;
+  try { userField = await page.waitForSelector('input[name="username"]', { timeout: 12000 }); } catch {}
 
-  if (!usernameField) {
-    // Maybe Instagram already redirected us to the feed (session valid)
-    const url = page.url();
-    if (!url.includes('accounts/login')) {
-      log('[login] Already redirected away from login — session may be valid');
-      await saveSession(context);
+  if (!userField) {
+    if (!page.url().includes('accounts/login')) {
+      log('[login] Redirigido fuera del login — sesión válida');
+      await persistSession(context);
       return;
     }
     await snap(page);
-    throw new Error('[login] Login form not found — Instagram may be blocking the request. Check logs/screenshot.');
+    throw new Error('[login] Instagram bloqueó el acceso desde esta IP. Sube tu sesión desde la pestaña "Sesión IG".');
   }
 
-  log('[login] Filling credentials...');
+  log('[login] Introduciendo credenciales...');
   await humanType(page, 'input[name="username"]', process.env.INSTAGRAM_USER);
   await randomDelay(400, 900);
   await humanType(page, 'input[name="password"]', process.env.INSTAGRAM_PASS);
   await randomDelay(600, 1200);
   await snap(page);
   await page.keyboard.press('Enter');
-
-  try {
-    await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 });
-  } catch {}
+  try { await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }); } catch {}
   await randomDelay(2000, 4000);
   await snap(page);
 
   const url = page.url();
-
   if (url.includes('/challenge/') || url.includes('/two_factor') || url.includes('/checkpoint/')) {
-    throw new Error(
-      '[login] Instagram requested verification (2FA/email/SMS). ' +
-      'Complete it manually, export cookies to session.json and re-deploy.'
-    );
+    throw new Error('[login] Instagram pide verificación (2FA/email). Sube tu sesión desde "Sesión IG".');
   }
   if (url.includes('accounts/login')) {
-    throw new Error('[login] Login failed — wrong INSTAGRAM_USER or INSTAGRAM_PASS');
+    throw new Error('[login] Login fallido — revisa INSTAGRAM_USER / INSTAGRAM_PASS o sube tu sesión.');
   }
 
-  log('[login] Login successful');
-  await saveSession(context);
+  log('[login] Login correcto');
+  await persistSession(context);
 }
 
 async function ensureLoggedIn(page, context) {
-  const loaded = await loadSession(context);
-  if (loaded) {
-    const ok = await isLoggedIn(page);
-    if (ok) { log('[session] Session valid, skipping login'); return; }
-    log('[session] Session expired, logging in again...');
+  const hasCookies = await applySession(context);
+  if (hasCookies && await isLoggedIn(page)) {
+    log('[sesión] Sesión válida, login omitido');
+    return;
   }
+  if (hasCookies) log('[sesión] Sesión caducada, reintentando login...');
   await login(page, context);
 }
 
@@ -180,10 +153,10 @@ async function fetchProfileBio(page, username) {
 }
 
 async function extractSuggestedProfiles(page, limit = 10) {
-  log('[scrape] Navigating to explore/people...');
+  log('[scrape] Explorando perfiles sugeridos...');
   await page.goto('https://www.instagram.com/explore/people/', { waitUntil: 'domcontentloaded' });
   await randomDelay(2000, 4000);
-  for (let i = 0; i < 4; i++) { await smoothScroll(page, 500); }
+  for (let i = 0; i < 4; i++) await smoothScroll(page, 500);
   await randomDelay(1000, 2000);
   await snap(page);
 
@@ -195,11 +168,9 @@ async function extractSuggestedProfiles(page, limit = 10) {
       if (!href || !href.match(/^\/[a-zA-Z0-9._]+\/$/) || seen.has(href)) continue;
       seen.add(href);
       const username = href.replace(/\//g, '');
-      const container = card.closest('div[class]');
-      const texts = container
-        ? [...container.querySelectorAll('span, div')].map(el => el.innerText?.trim()).filter(Boolean)
-        : [];
-      results.push({ username, name: texts[0] || username, bio: texts.slice(1).find(t => t.length > 10 && t !== username) || '' });
+      const c = card.closest('div[class]');
+      const texts = c ? [...c.querySelectorAll('span, div')].map((e) => e.innerText?.trim()).filter(Boolean) : [];
+      results.push({ username, name: texts[0] || username, bio: texts.slice(1).find((t) => t.length > 10 && t !== username) || '' });
       if (results.length >= max) break;
     }
     return results;
@@ -207,120 +178,125 @@ async function extractSuggestedProfiles(page, limit = 10) {
 
   const enriched = [];
   for (const p of profiles) {
-    if (!p.bio) {
-      const bio = await fetchProfileBio(page, p.username);
-      enriched.push({ ...p, bio });
-    } else {
-      enriched.push(p);
-    }
+    if (!p.bio) enriched.push({ ...p, bio: await fetchProfileBio(page, p.username) });
+    else enriched.push(p);
     await randomDelay(800, 1500);
   }
-
-  log(`[scrape] Found ${enriched.length} profiles`);
+  log(`[scrape] ${enriched.length} perfiles encontrados`);
   return enriched;
 }
 
 async function sendDM(page, username, message) {
-  log(`[dm] Opening profile: @${username}`);
+  log(`[dm] Abriendo perfil: @${username}`);
   await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded' });
   await randomDelay(1500, 3000);
   await smoothScroll(page, 200);
   await randomDelay(500, 1000);
   await snap(page);
 
-  const msgBtn = await page.$('div[role="button"]:has-text("Message"), button:has-text("Message")');
-  if (!msgBtn) { log(`[dm] No Message button for @${username}, skipping`); return false; }
+  const msgBtn = await page.$('div[role="button"]:has-text("Message"), button:has-text("Message"), div[role="button"]:has-text("Enviar mensaje")');
+  if (!msgBtn) { log(`[dm] Sin botón Mensaje para @${username}, se omite`); return false; }
 
   await msgBtn.click();
   await randomDelay(2000, 4000);
-
   const notNow = await page.$('button:has-text("Not Now"), button:has-text("Ahora no")');
   if (notNow) { await notNow.click(); await randomDelay(800, 1500); }
-
   await snap(page);
 
   const input = await page.waitForSelector(
-    'div[contenteditable="true"][role="textbox"], textarea[placeholder*="Message"]',
+    'div[contenteditable="true"][role="textbox"], textarea[placeholder*="Message"], textarea[placeholder*="Mensaje"]',
     { timeout: 10000 }
   );
   await input.click();
   await randomDelay(500, 1000);
-
-  for (const char of message) {
-    await page.keyboard.type(char, { delay: randomInt(80, 200) });
-  }
-
+  for (const ch of message) await page.keyboard.type(ch, { delay: randomInt(80, 200) });
   await snap(page);
   await randomDelay(800, 1500);
   await page.keyboard.press('Enter');
   await randomDelay(1500, 3000);
   await snap(page);
-  log(`[dm] Message sent to @${username}`);
+  log(`[dm] Mensaje enviado a @${username}`);
   return true;
 }
 
-async function runOutreach(dailyLimit = 20) {
-  const alreadyContacted = new Set(loadLeads().map((l) => l.username));
+async function runOutreach(dailyLimit, trigger = 'manual') {
+  const cfg = loadConfig();
+  dailyLimit = dailyLimit || cfg.dailyLimit;
+  const runId = store.startRun(trigger);
+  log(`[outreach] Iniciando ejecución (${trigger}, límite ${dailyLimit})`);
+
   const browser = await launchBrowser();
-  const context = await browser.newContext({
+  const ctxOpts = {
     userAgent: USER_AGENT,
     viewport: { width: 1280, height: 800 },
     locale: 'es-ES',
-  });
+    timezoneId: 'Europe/Madrid',
+  };
+  let videoName = null;
+  if (cfg.recordVideo) {
+    ctxOpts.recordVideo = { dir: RECORDINGS_DIR, size: { width: 1280, height: 800 } };
+  }
+  const context = await browser.newContext(ctxOpts);
   const page = await context.newPage();
   _activePage = page;
-
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
   });
 
+  let sent = 0, skipped = 0, errors = 0;
   try {
     await ensureLoggedIn(page, context);
     const profiles = await extractSuggestedProfiles(page, dailyLimit + 10);
-    const fresh = profiles.filter((p) => !alreadyContacted.has(p.username));
-    log(`[outreach] ${fresh.length} new profiles (limit: ${dailyLimit})`);
+    const fresh = profiles.filter((p) => !store.hasContacted(p.username));
+    log(`[outreach] ${fresh.length} perfiles nuevos (límite ${dailyLimit})`);
 
     const { generateDM } = require('./llm');
     let count = 0;
-
     for (const profile of fresh) {
       if (count >= dailyLimit) break;
-      log(`[outreach] Processing @${profile.username}`);
+      log(`[outreach] Procesando @${profile.username}`);
       let message = '', status = 'error';
       try {
-        const bio = profile.bio || 'emprendedor en Instagram';
-        message = await generateDM(bio);
+        message = await generateDM(profile.bio || 'emprendedor en Instagram');
         log(`[llm] DM: ${message.substring(0, 55)}...`);
-        const sent = await sendDM(page, profile.username, message);
-        status = sent ? 'sent' : 'skipped';
+        const ok = await sendDM(page, profile.username, message);
+        status = ok ? 'sent' : 'skipped';
       } catch (err) {
         log(`[outreach] Error @${profile.username}: ${err.message}`);
       }
+      if (status === 'sent') sent++;
+      else if (status === 'skipped') skipped++;
+      else errors++;
 
-      appendLead({ username: profile.username, name: profile.name, bio: profile.bio, message, timestamp: new Date().toISOString(), status });
+      store.addLead({ ...profile, message, status, timestamp: new Date().toISOString() });
+      store.updateRun(runId, { sent, skipped, errors });
       count++;
 
       if (count < dailyLimit && status === 'sent') {
-        const { load: loadConfig } = require('./config');
-        const cfg = loadConfig();
         const wait = randomInt(cfg.intervalMin * 60000, cfg.intervalMax * 60000);
-        log(`[outreach] Waiting ${Math.round(wait / 60000)} min before next DM...`);
+        log(`[outreach] Esperando ${Math.round(wait / 60000)} min...`);
         await sleep(wait);
       }
     }
-
-    log(`[outreach] Done. Sent ${count} DMs.`);
+    log(`[outreach] Terminado. ${sent} enviados, ${skipped} omitidos, ${errors} errores.`);
   } catch (err) {
-    if (err.message.includes('verification') || err.message.includes('2FA')) {
-      log(`[FATAL] ${err.message}`);
-      process.exit(1);
-    }
-    log(`[outreach] Unexpected error: ${err.message}`);
+    log(`[outreach] Error inesperado: ${err.message}`);
     try { await snap(page); } catch {}
+    errors++;
   } finally {
     _activePage = null;
+    try {
+      const video = page.video();
+      await context.close();
+      if (video) {
+        const orig = await video.path();
+        videoName = `rec-${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
+        fs.renameSync(orig, path.join(RECORDINGS_DIR, videoName));
+      }
+    } catch {}
     await browser.close();
+    store.finishRun(runId, { sent, skipped, errors, video: videoName });
   }
 }
 
-module.exports = { runOutreach, loadLeads, getActivePage, snap };
+module.exports = { runOutreach, getActivePage, snap };

@@ -4,20 +4,31 @@ const { log } = require('./logger');
 const { load: loadConfig } = require('./config');
 
 let task = null;
+const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
 function reschedule(cfg) {
   if (task) { task.stop(); task = null; }
-  if (!cfg.enabled) { log('[scheduler] Disabled — no cron scheduled'); return; }
+  if (!cfg.enabled) { log('[scheduler] Desactivado — sin cron programado'); return; }
+
   const expr = `${cfg.cronMinute} ${cfg.cronHour} * * *`;
   const hh = String(cfg.cronHour).padStart(2, '0');
   const mm = String(cfg.cronMinute).padStart(2, '0');
-  log(`[scheduler] Scheduled at ${hh}:${mm} UTC daily (limit: ${cfg.dailyLimit})`);
+  const days = (cfg.days || []).map((d) => DAY_NAMES[d]).join(', ') || 'ninguno';
+  log(`[scheduler] Programado ${hh}:${mm} UTC los días: ${days} (límite: ${cfg.dailyLimit})`);
+
   task = cron.schedule(expr, async () => {
-    log(`[scheduler] Starting daily run — ${new Date().toISOString()}`);
+    const today = new Date().getUTCDay();
+    const fresh = loadConfig();
+    if (!fresh.enabled) return;
+    if (!(fresh.days || []).includes(today)) {
+      log(`[scheduler] Hoy (${DAY_NAMES[today]}) no está programado — se omite`);
+      return;
+    }
+    log(`[scheduler] Ejecución diaria — ${new Date().toISOString()}`);
     try {
-      await require('./instagram').runOutreach(cfg.dailyLimit);
+      await require('./instagram').runOutreach(fresh.dailyLimit, 'scheduled');
     } catch (err) {
-      log(`[scheduler] Run failed: ${err.message}`);
+      log(`[scheduler] Falló la ejecución: ${err.message}`);
     }
   });
 }
