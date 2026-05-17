@@ -148,6 +148,16 @@ tr:hover td{background:#1e1e32}
       </div>
     </div>
 
+    <!-- Live browser view -->
+    <div class="panel" id="browser-panel" style="display:none">
+      <h2>Vista en vivo del agente</h2>
+      <div style="position:relative;background:#000;border-radius:8px;overflow:hidden;min-height:180px">
+        <img id="browser-img" src="" alt="screenshot" style="width:100%;display:block;border-radius:8px">
+        <div id="browser-offline" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#333;font-size:.8rem">Sin actividad</div>
+      </div>
+      <div style="font-size:.68rem;color:#333;margin-top:6px;text-align:center">Se actualiza cada 3 segundos mientras el agente está activo</div>
+    </div>
+
     <div class="panel logs-panel">
       <h2>Logs en tiempo real <button onclick="document.getElementById('log-box').innerHTML=''">Limpiar</button></h2>
       <div id="log-box"></div>
@@ -222,11 +232,51 @@ function appendLog(e){const d=document.createElement('div');d.innerHTML=`<span c
 new EventSource('/api/logs').onmessage=e=>appendLog(JSON.parse(e.data));
 
 const dot=document.getElementById('status-dot'),stText=document.getElementById('status-text'),runBtn=document.getElementById('btn-run');
+
+// Screenshot live view
+const browserPanel=document.getElementById('browser-panel');
+const browserImg=document.getElementById('browser-img');
+const browserOffline=document.getElementById('browser-offline');
+let screenshotInterval=null;
+
+async function refreshScreenshot(){
+  try{
+    const r=await fetch('/api/screenshot',{cache:'no-store'});
+    if(r.status===204||!r.ok){
+      browserImg.style.display='none';
+      browserOffline.style.display='flex';
+    } else {
+      const blob=await r.blob();
+      const url=URL.createObjectURL(blob);
+      const old=browserImg.src;
+      browserImg.src=url;
+      browserImg.style.display='block';
+      browserOffline.style.display='none';
+      if(old.startsWith('blob:'))URL.revokeObjectURL(old);
+    }
+  }catch{}
+}
+
+function startScreenshots(){
+  browserPanel.style.display='';
+  if(!screenshotInterval){
+    refreshScreenshot();
+    screenshotInterval=setInterval(refreshScreenshot,3000);
+  }
+}
+function stopScreenshots(){
+  clearInterval(screenshotInterval);
+  screenshotInterval=null;
+  browserImg.style.display='none';
+  browserOffline.style.display='flex';
+}
+
 async function pollStatus(){
   const{running}=await fetch('/api/status').then(r=>r.json());
   dot.className=running?'running':'';
   stText.textContent=running?'Ejecutando...':'Idle';
   runBtn.textContent=running?'⏳ En ejecución':'▶ Enviar ahora';
+  if(running) startScreenshots(); else stopScreenshots();
 }
 
 loadConfig();loadStats();loadLeads();pollStatus();

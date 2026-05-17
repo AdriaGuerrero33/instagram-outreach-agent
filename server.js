@@ -79,6 +79,21 @@ app.post('/api/run', (req, res) => {
     .finally(() => { running = false; });
 });
 
+// ── Live screenshot ───────────────────────────────────────────
+app.get('/api/screenshot', async (req, res) => {
+  const { getActivePage, snap } = require('./instagram');
+  const page = getActivePage();
+  if (!page) return res.status(204).end();
+  try {
+    await snap(page);
+    const file = require('path').join(__dirname, 'public', 'screenshot.png');
+    res.set('Cache-Control', 'no-store');
+    res.sendFile(file);
+  } catch {
+    res.status(500).end();
+  }
+});
+
 // ── Log stream (SSE) ──────────────────────────────────────────
 app.get('/api/logs', (req, res) => {
   res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
