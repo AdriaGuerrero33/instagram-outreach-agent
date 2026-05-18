@@ -327,6 +327,7 @@ async function extractEntrepreneurProfiles(page, limit = 10) {
     if (isCompanyAccount(username, info.bio, info.name)) { log(`[scrape] @${username} parece empresa, omitida`); continue; }
 
     const score = entrepreneurScore(info.bio);
+    if (score < 1) { log(`[scrape] @${username} sin keywords de emprendimiento, omitida`); continue; }
     profiles.push({ username, name: info.name, bio: info.bio, _score: score });
     await randomDelay(600, 1200);
   }
@@ -422,7 +423,7 @@ async function sendDM(page, username, message) {
 }
 
 // ── Outreach principal ────────────────────────────────────────
-async function runOutreach(dailyLimit, trigger = 'manual') {
+async function runOutreach(dailyLimit, trigger = 'manual', stopSignal = {}) {
   const cfg = loadConfig();
   dailyLimit = dailyLimit || cfg.dailyLimit;
   const runId = store.startRun(trigger);
@@ -457,6 +458,7 @@ async function runOutreach(dailyLimit, trigger = 'manual') {
     let count = 0;
     for (const profile of fresh) {
       if (count >= dailyLimit) break;
+      if (stopSignal.stop) { log('[outreach] ⏹ Parada solicitada — detenido'); break; }
 
       // Doble comprobación anti-duplicado justo antes de enviar
       if (store.hasContacted(profile.username)) {

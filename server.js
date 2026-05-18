@@ -153,18 +153,30 @@ app.post('/api/session', (req, res) => {
 });
 app.delete('/api/session', (req, res) => { store.clearSession(); log('[sesión] Sesión borrada'); res.json({ active: false }); });
 
-// ── Run now ───────────────────────────────────────────────────
+// ── Run now / Stop ────────────────────────────────────────────
 let running = false;
+const stopSignal = { stop: false };
+
 app.get('/api/status', (req, res) => res.json({ running }));
+
 app.post('/api/run', (req, res) => {
   if (running) return res.status(409).json({ error: 'Ya está en ejecución' });
   const cfg = loadConfig();
+  const limit = parseInt((req.body || {}).limit, 10) || cfg.dailyLimit;
   running = true;
-  log('[panel] Ejecución manual lanzada');
-  res.json({ started: true });
-  require('./instagram').runOutreach(cfg.dailyLimit, 'manual')
+  stopSignal.stop = false;
+  log(`[panel] Ejecución manual lanzada (${limit} DMs)`);
+  res.json({ started: true, limit });
+  require('./instagram').runOutreach(limit, 'manual', stopSignal)
     .catch((err) => log(`[panel] Error: ${err.message}`))
-    .finally(() => { running = false; });
+    .finally(() => { running = false; stopSignal.stop = false; });
+});
+
+app.post('/api/stop', (req, res) => {
+  if (!running) return res.status(409).json({ error: 'No hay ejecución activa' });
+  stopSignal.stop = true;
+  log('[panel] ⏹ Parada solicitada — termina tras el DM actual');
+  res.json({ stopping: true });
 });
 
 // ── Live screenshot ───────────────────────────────────────────

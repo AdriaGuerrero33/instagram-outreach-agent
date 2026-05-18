@@ -46,6 +46,7 @@ textarea{resize:vertical;min-height:90px;line-height:1.5}
 .btn-s{background:#22223a;border:1px solid var(--bd);color:#bbb}
 .btn-d{background:#3a1a1a;color:#f88;border:1px solid #5a2a2a}
 .sm{font-size:.75rem;padding:6px 10px}
+.active-count{background:linear-gradient(135deg,var(--pink),var(--purple))!important;color:#fff!important;border-color:transparent!important}
 .toggle{position:relative;width:42px;height:22px;flex:none}
 .toggle input{opacity:0;width:0;height:0}
 .slider{position:absolute;inset:0;cursor:pointer;background:var(--bd);border-radius:22px;transition:.3s}
@@ -119,8 +120,22 @@ tr.lead-row:hover td{background:#1e1e30}
     <div class="cols" style="margin-top:16px">
       <div class="panel" style="margin-top:0">
         <h2>Control</h2>
-        <button class="btn btn-p" id="btn-run" onclick="runNow()">▶ Enviar ahora</button>
-        <div id="run-msg"></div>
+        <div style="margin-bottom:10px">
+          <div style="font-size:.72rem;color:#777;margin-bottom:6px">Cuántos DMs enviar ahora</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap" id="dmcount-btns">
+            <button class="btn btn-s sm dmcount" data-n="1" onclick="setDmCount(1)">1</button>
+            <button class="btn btn-s sm dmcount" data-n="3" onclick="setDmCount(3)">3</button>
+            <button class="btn btn-s sm dmcount" data-n="5" onclick="setDmCount(5)">5</button>
+            <button class="btn btn-s sm dmcount active-count" data-n="10" onclick="setDmCount(10)">10</button>
+            <button class="btn btn-s sm dmcount" data-n="20" onclick="setDmCount(20)">20</button>
+            <button class="btn btn-s sm dmcount" data-n="50" onclick="setDmCount(50)">50</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-p" id="btn-run" onclick="runNow()" style="flex:1">▶ Enviar ahora</button>
+          <button class="btn btn-d" id="btn-stop" onclick="stopNow()" style="display:none;flex:1">⏹ Parar</button>
+        </div>
+        <div id="run-msg" style="margin-top:8px;font-size:.78rem;text-align:center;min-height:15px"></div>
       </div>
       <div>
         <div class="panel" style="margin-top:0">
@@ -269,14 +284,29 @@ async function loadStats(){
   $('s-next').textContent=cfg.enabled?nextRun(cfg.cronHour,cfg.cronMinute,cfg.days):'Desactivado';
   $('s-last').textContent='Últ: '+fmt(s.lastRun);
 }
-async function runNow(){
-  const b=$('btn-run'),m=$('run-msg');b.disabled=true;
-  const r=await fetch('/api/run',{method:'POST'});
-  if(r.status===409){m.textContent='Ya está en ejecución.';m.style.color='#ffb74d'}
-  else{m.textContent='Iniciado. Mira la vista en vivo y los logs.';m.style.color='#4caf50'}
-  setTimeout(()=>{b.disabled=false;m.textContent=''},4000);
+let _dmCount=10;
+function setDmCount(n){
+  _dmCount=n;
+  document.querySelectorAll('.dmcount').forEach(b=>{
+    b.classList.toggle('active-count',+b.dataset.n===n);
+  });
 }
-const dot=$('status-dot'),stx=$('status-text'),rbtn=$('btn-run'),shot=$('shot'),shotOff=$('shot-off');
+async function runNow(){
+  const b=$('btn-run'),m=$('run-msg');
+  b.disabled=true;
+  const r=await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({limit:_dmCount})});
+  if(r.status===409){m.style.color='#ffb74d';m.textContent='Ya está en ejecución.'}
+  else{m.style.color='#4caf50';m.textContent=`Iniciado — ${_dmCount} DM${_dmCount>1?'s':''} objetivo. Mira la vista en vivo.`}
+  setTimeout(()=>{b.disabled=false;m.textContent=''},5000);
+}
+async function stopNow(){
+  const r=await fetch('/api/stop',{method:'POST'});
+  const m=$('run-msg');
+  if(r.ok){m.style.color='#ffb74d';m.textContent='⏹ Parada solicitada — termina el DM actual y para.'}
+  else{m.style.color='#f85149';m.textContent='No hay ejecución activa'}
+  setTimeout(()=>{m.textContent=''},5000);
+}
+const dot=$('status-dot'),stx=$('status-text'),rbtn=$('btn-run'),rsbtn=$('btn-stop'),shot=$('shot'),shotOff=$('shot-off');
 async function refreshShot(){
   try{const r=await fetch('/api/screenshot',{cache:'no-store'});
     if(r.status===204||!r.ok){shot.style.display='none';shotOff.style.display='flex'}
@@ -288,6 +318,8 @@ async function pollStatus(){
   const{running}=await fetch('/api/status').then(r=>r.json());
   dot.className=running?'running':'';stx.textContent=running?'Ejecutando...':'Idle';
   rbtn.textContent=running?'⏳ En ejecución':'▶ Enviar ahora';
+  rbtn.style.display=running?'none':'';
+  rsbtn.style.display=running?'':'none';
   clearInterval(shotTimer);shotTimer=setInterval(refreshShot,running?3000:12000);
 }
 const lbox=$('log-box');let autoS=true;
