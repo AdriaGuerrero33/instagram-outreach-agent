@@ -239,18 +239,56 @@ async function extractFromHashtag(page, tag, limit) {
   }
 }
 
-// Extrae perfiles de emprendedores desde hashtags, filtrando empresas
+// Extrae perfiles sugeridos de explore/people
+async function extractSuggested(page, limit) {
+  log('[scrape] Explorando perfiles sugeridos...');
+  try {
+    await page.goto('https://www.instagram.com/explore/people/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await randomDelay(2000, 3500);
+    await dismissCookies(page);
+    for (let i = 0; i < 4; i++) { await smoothScroll(page, 500); await randomDelay(400, 800); }
+    await snap(page);
+
+    return await page.evaluate((max) => {
+      const results = [], seen = new Set();
+      const cards = document.querySelectorAll('div[class*="x1lliihq"] a[href^="/"]');
+      for (const card of cards) {
+        const href = card.getAttribute('href');
+        if (!href || !href.match(/^\/[a-zA-Z0-9._]+\/$/) || seen.has(href)) continue;
+        seen.add(href);
+        const username = href.replace(/\//g, '');
+        if (results.length >= max) break;
+        results.push(username);
+      }
+      return results;
+    }, limit * 3);
+  } catch (e) {
+    log(`[scrape] Error en sugeridos: ${e.message}`);
+    return [];
+  }
+}
+
+// Extrae perfiles de emprendedores (sugeridos + hashtags), filtrando empresas
 async function extractEntrepreneurProfiles(page, limit = 10) {
   const cfg = loadConfig();
   const hashtags = cfg.targetHashtags && cfg.targetHashtags.length ? cfg.targetHashtags : DEFAULT_HASHTAGS;
   const seen = new Set();
   const rawUsernames = [];
 
-  for (const tag of hashtags) {
-    if (rawUsernames.length >= limit * 3) break;
-    const users = await extractFromHashtag(page, tag, Math.ceil(limit / 2) + 3);
-    for (const u of users) {
-      if (!seen.has(u)) { seen.add(u); rawUsernames.push(u); }
+  // 1. Sugeridos de explore/people
+  const suggested = await extractSuggested(page, limit);
+  for (const u of suggested) {
+    if (!seen.has(u) && !store.hasContacted(u)) { seen.add(u); rawUsernames.push(u); }
+  }
+
+  // 2. Hashtags si necesitamos más candidatos
+  if (rawUsernames.length < limit * 2) {
+    for (const tag of hashtags) {
+      if (rawUsernames.length >= limit * 3) break;
+      const users = await extractFromHashtag(page, tag, Math.ceil(limit / 2) + 3);
+      for (const u of users) {
+        if (!seen.has(u) && !store.hasContacted(u)) { seen.add(u); rawUsernames.push(u); }
+      }
     }
   }
 
@@ -419,7 +457,19 @@ async function runOutreach(dailyLimit, trigger = 'manual') {
     let count = 0;
     for (const profile of fresh) {
       if (count >= dailyLimit) break;
+
+      // Doble comprobación anti-duplicado justo antes de enviar
+      if (store.hasContacted(profile.username)) {
+        log(`[outreach] @${profile.username} ya contactado, se salta`);
+        continue;
+      }
+
       log(`[outreach] Procesando @${profile.username} (score: ${profile._score || 0})`);
+
+      // Registrar ANTES de enviar para evitar duplicados aunque el proceso crashee
+      const { _score, ...profileData } = profile;
+      const leadEntry = store.addLead({ ...profileData, message: '', status: 'pending', timestamp: new Date().toISOString() });
+
       let message = '', status = 'error';
       try {
         message = await generateDM(profile.bio || 'emprendedor en Instagram');
@@ -434,8 +484,8 @@ async function runOutreach(dailyLimit, trigger = 'manual') {
       else if (status === 'skipped') skipped++;
       else errors++;
 
-      const { _score, ...profileData } = profile;
-      store.addLead({ ...profileData, message, status, timestamp: new Date().toISOString() });
+      // Actualizar el lead con el resultado real
+      store.updateLead(leadEntry.id, { message, status });
       store.updateRun(runId, { sent, skipped, errors });
       count++;
 
