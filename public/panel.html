@@ -215,19 +215,21 @@ tr.lead-row:hover td{background:#1e1e30}
       <h2>Sesión de Instagram</h2>
       <div class="banner">
         <strong>⚠ Importante:</strong> Instagram bloquea logins automáticos desde servidores (la IP de Railway).
-        La forma fiable de que funcione es subir aquí tu sesión:
-        <br>1. Entra a instagram.com en tu navegador (ya logueado).
-        <br>2. Instala la extensión <b>Cookie-Editor</b> (Chrome/Firefox).
-        <br>3. Ábrela en instagram.com → <b>Export</b> → <b>JSON</b> → copia.
-        <br>4. Pega el JSON aquí abajo y pulsa Guardar.
+        La forma más fácil: <b>corre <code>node get-session.js</code> en tu ordenador</b> (está incluido en el repo), entra en Instagram cuando abra Chrome, y el script guarda <code>session.json</code> — súbelo aquí con el botón de abajo.<br>
+        <span style="color:#aaa">Alternativa manual: extensión Cookie-Editor → Export JSON → pega abajo.</span>
       </div>
       <div class="trow" style="border-bottom:1px solid var(--bd);padding-bottom:14px;margin-bottom:14px">
         <span>Estado de la sesión</span>
         <strong id="ses-state">—</strong>
       </div>
+      <div id="ses-drop" style="border:2px dashed var(--bd);border-radius:10px;padding:22px;text-align:center;cursor:pointer;margin-bottom:12px;transition:.2s;color:#666;font-size:.85rem" onclick="$('ses-file').click()" ondragover="event.preventDefault();this.style.borderColor='var(--purple)'" ondragleave="this.style.borderColor='var(--bd)'" ondrop="sesDrop(event)">
+        <div style="font-size:1.4rem;margin-bottom:6px">📂</div>
+        Arrastra <code>session.json</code> aquí o <u>haz clic para seleccionar</u>
+        <input type="file" id="ses-file" accept=".json,application/json" style="display:none" onchange="sesFileLoad(this.files[0])">
+      </div>
       <div class="field">
-        <label>Pega el JSON de cookies exportado</label>
-        <textarea id="ses-json" style="min-height:160px" placeholder='[{"name":"sessionid","value":"...","domain":".instagram.com",...}]'></textarea>
+        <label style="color:#666;font-size:.73rem">O pega el JSON directamente</label>
+        <textarea id="ses-json" style="min-height:110px" placeholder='[{"name":"sessionid","value":"...","domain":".instagram.com",...}]'></textarea>
       </div>
       <div class="row">
         <button class="btn btn-p" onclick="saveSession()">Guardar sesión</button>
@@ -398,11 +400,21 @@ async function loadSession(){
   const s=await fetch('/api/session').then(r=>r.json());
   $('ses-state').innerHTML=s.active?'<span class="ok">● Activa</span>':'<span class="no">● Sin sesión</span>';
 }
+function sesFileLoad(file){
+  if(!file)return;
+  const r=new FileReader();
+  r.onload=e=>{$('ses-json').value=e.target.result;$('ses-drop').style.borderColor='var(--purple)';$('ses-msg').style.color='#aaa';$('ses-msg').textContent=`📄 ${file.name} cargado — pulsa Guardar`};
+  r.readAsText(file);
+}
+function sesDrop(e){
+  e.preventDefault();$('ses-drop').style.borderColor='var(--bd)';
+  const f=e.dataTransfer.files[0];if(f)sesFileLoad(f);
+}
 async function saveSession(){
   const m=$('ses-msg');
   const r=await fetch('/api/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cookies:$('ses-json').value})});
   const d=await r.json();
-  if(r.ok){m.style.color='#4caf50';m.textContent=`Sesión guardada (${d.count} cookies) ✓`;$('ses-json').value='';loadSession()}
+  if(r.ok){m.style.color='#4caf50';m.textContent=`Sesión guardada (${d.count} cookies) ✓`;$('ses-json').value='';$('ses-drop').style.borderColor='var(--bd)';loadSession()}
   else{m.style.color='#f85149';m.textContent=d.error||'Error'}
 }
 async function clearSession(){
