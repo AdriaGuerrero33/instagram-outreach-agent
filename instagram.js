@@ -90,20 +90,36 @@ async function persistSession(context) {
   } catch {}
 }
 
-async function dismissCookies(page) {
+async function dismissPopups(page) {
+  // Textos de botones "No gracias" en cualquier idioma
+  const noThanks = [
+    'Not Now', 'Ahora no', 'No ahora', 'Skip', 'Cancel', 'Cancelar',
+    'Close', 'Cerrar', 'Maybe Later', 'Quizás más tarde',
+  ];
+  for (const txt of noThanks) {
+    try {
+      const btn = await page.$(`button:has-text("${txt}"), [role="button"]:has-text("${txt}")`);
+      if (btn) { await btn.click(); await randomDelay(300, 600); }
+    } catch {}
+  }
+  // Cookies / GDPR
   try {
     const btn = await page.$(
       'button:has-text("Allow all cookies"), button:has-text("Accept All"), button:has-text("Aceptar todo"), button:has-text("Permitir todas")'
     );
-    if (btn) { await btn.click(); await randomDelay(800, 1500); }
+    if (btn) { await btn.click(); await randomDelay(500, 900); }
   } catch {}
 }
+
+// Mantiene como alias por compatibilidad
+const dismissCookies = dismissPopups;
 
 async function isLoggedIn(page) {
   try {
     await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await dismissCookies(page);
+    await dismissPopups(page);
     await randomDelay(1500, 2500);
+    await dismissPopups(page);
     await snap(page);
     const loginInput = await page.$('input[name="username"]');
     return !loginInput && page.url().includes('instagram.com');
@@ -320,27 +336,23 @@ async function findMessageButton(page) {
 async function sendDM(page, username, message) {
   log(`[dm] Abriendo perfil: @${username}`);
   await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded', timeout: 20000 });
-  await randomDelay(1500, 3000);
+  await randomDelay(1200, 2500);
+  await dismissPopups(page);
   await smoothScroll(page, 200);
-  await randomDelay(500, 1000);
+  await randomDelay(400, 900);
   await snap(page);
 
   const msgBtn = await findMessageButton(page);
   if (!msgBtn) {
-    log(`[dm] Sin botón Mensaje para @${username} (cuenta privada o sin DMs), se omite`);
+    log(`[dm] Sin botón Mensaje para @${username} (privada o sin DMs), se omite`);
     return false;
   }
 
   await msgBtn.click();
-  await randomDelay(2000, 4000);
-
-  // Descartar popups
-  for (const txt of ['Not Now', 'Ahora no', 'No ahora', 'Cancel', 'Cancelar']) {
-    try {
-      const btn = await page.$(`button:has-text("${txt}")`);
-      if (btn) { await btn.click(); await randomDelay(600, 1200); break; }
-    } catch {}
-  }
+  await randomDelay(1500, 3000);
+  await dismissPopups(page);   // Elimina "Turn on Notifications", "Save login", etc.
+  await randomDelay(500, 1000);
+  await dismissPopups(page);   // Segunda pasada por si tarda en aparecer
   await snap(page);
 
   // Esperar el campo de texto del DM
@@ -351,18 +363,29 @@ async function sendDM(page, username, message) {
       { timeout: 12000 }
     );
   } catch {
-    log(`[dm] No apareció el cuadro de texto para @${username}, se omite`);
-    await snap(page);
-    return false;
+    // Último intento: puede que un popup bloqueara el selector
+    await dismissPopups(page);
+    await randomDelay(800, 1500);
+    try {
+      input = await page.waitForSelector(
+        'div[contenteditable="true"][role="textbox"], textarea[placeholder*="essage"], textarea[placeholder*="ensaje"]',
+        { timeout: 6000 }
+      );
+    } catch {
+      log(`[dm] No apareció el cuadro de texto para @${username}, se omite`);
+      await snap(page);
+      return false;
+    }
   }
 
   await input.click();
-  await randomDelay(500, 1000);
+  await randomDelay(400, 900);
   for (const ch of message) await page.keyboard.type(ch, { delay: randomInt(60, 160) });
   await snap(page);
-  await randomDelay(800, 1500);
+  await randomDelay(700, 1400);
   await page.keyboard.press('Enter');
-  await randomDelay(1500, 3000);
+  await randomDelay(1200, 2500);
+  await dismissPopups(page);   // Por si aparece algo tras enviar
   await snap(page);
   log(`[dm] ✓ Mensaje enviado a @${username}`);
   return true;
@@ -441,7 +464,13 @@ async function runOutreach(dailyLimit, trigger = 'manual', stopSignal = {}) {
       if (count < dailyLimit && status === 'sent') {
         const wait = randomInt(cfg.intervalMin * 60000, cfg.intervalMax * 60000);
         log(`[outreach] Esperando ${Math.round(wait / 60000)} min...`);
+        // Navegar a home durante la espera para que Instagram no muestre popups raros
+        try {
+          await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded', timeout: 15000 });
+          await dismissPopups(page);
+        } catch {}
         await sleep(wait);
+        if (!page.isClosed()) await dismissPopups(page);
       }
     }
     log(`[outreach] Terminado. ${sent} enviados, ${skipped} omitidos, ${errors} errores.`);
