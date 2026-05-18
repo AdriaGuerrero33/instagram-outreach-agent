@@ -129,24 +129,10 @@ app.post('/api/session', (req, res) => {
   try {
     if (typeof cookies === 'string') cookies = JSON.parse(cookies);
     if (!Array.isArray(cookies) || !cookies.length) throw new Error('formato inválido');
-    const sameSiteMap = { strict: 'Strict', lax: 'Lax', none: 'None', no_restriction: 'None' };
-    cookies = cookies.map((c) => {
-      const rawSS = (c.sameSite || '').toLowerCase();
-      const sameSite = sameSiteMap[rawSS] || 'Lax';
-      const expires = (c.expirationDate || c.expires || 0) > 0
-        ? (c.expirationDate || c.expires)
-        : undefined;
-      return {
-        name: c.name, value: c.value,
-        domain: c.domain || '.instagram.com',
-        path: c.path || '/',
-        httpOnly: !!c.httpOnly, secure: c.secure !== false,
-        sameSite, expires,
-      };
-    });
+    cookies = store.normalizeCookies(cookies);
     store.saveSessionCookies(cookies);
     log(`[sesión] Sesión subida (${cookies.length} cookies)`);
-    res.json({ active: true, count: cookies.length });
+    res.json({ active: true, count: cookies.length, envValue: JSON.stringify(cookies) });
   } catch (e) {
     res.status(400).json({ error: 'JSON de cookies inválido: ' + e.message });
   }

@@ -94,14 +94,45 @@ function finishRun(id, patch) {
 }
 
 // ── Session (Instagram cookies) ───────────────────────────────
+function normalizeCookies(cookies) {
+  const sameSiteMap = { strict: 'Strict', lax: 'Lax', none: 'None', no_restriction: 'None' };
+  return cookies.map((c) => {
+    const rawSS = (c.sameSite || '').toLowerCase();
+    const sameSite = sameSiteMap[rawSS] || 'Lax';
+    const exp = c.expirationDate || c.expires || 0;
+    return {
+      name: c.name,
+      value: c.value,
+      domain: c.domain || '.instagram.com',
+      path: c.path || '/',
+      httpOnly: !!c.httpOnly,
+      secure: c.secure !== false,
+      sameSite,
+      expires: exp > 0 ? Math.floor(exp) : undefined,
+    };
+  });
+}
 function saveSessionCookies(cookies) {
   writeJSON(SESSION_FILE, cookies);
 }
 function loadSessionCookies() {
-  return readJSON(SESSION_FILE, null);
+  const fromFile = readJSON(SESSION_FILE, null);
+  if (Array.isArray(fromFile) && fromFile.length) return fromFile;
+  // Fallback: variable de entorno (sobrevive redeploys de Railway sin Volume)
+  if (process.env.IG_SESSION_JSON) {
+    try {
+      const parsed = JSON.parse(process.env.IG_SESSION_JSON);
+      if (Array.isArray(parsed) && parsed.length) return normalizeCookies(parsed);
+    } catch {}
+  }
+  return null;
 }
 function hasSession() {
-  return fs.existsSync(SESSION_FILE);
+  if (fs.existsSync(SESSION_FILE)) return true;
+  if (process.env.IG_SESSION_JSON) {
+    try { return JSON.parse(process.env.IG_SESSION_JSON).length > 0; } catch {}
+  }
+  return false;
 }
 function clearSession() {
   try { fs.unlinkSync(SESSION_FILE); } catch {}
@@ -127,6 +158,6 @@ module.exports = {
   DATA_DIR, SESSION_FILE,
   loadLeads, saveLeads, getLead, hasContacted, addLead, updateLead,
   loadRuns, startRun, updateRun, finishRun,
-  saveSessionCookies, loadSessionCookies, hasSession, clearSession,
+  normalizeCookies, saveSessionCookies, loadSessionCookies, hasSession, clearSession,
   calendarData,
 };

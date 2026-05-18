@@ -251,6 +251,16 @@ tr.lead-row:hover td{background:#1e1e30}
         <button class="btn btn-d" onclick="clearSession()">Borrar sesión</button>
       </div>
       <div id="ses-msg" style="text-align:center;font-size:.78rem;margin-top:10px;min-height:15px"></div>
+
+      <div id="ses-env" style="display:none;margin-top:18px;border-top:1px solid var(--bd);padding-top:16px">
+        <div class="banner" style="background:#10241a;border-color:#2a5a3a;color:#7ed9a0">
+          <strong>✓ Para que NO te lo pida nunca más:</strong> copia esto y pégalo en
+          <b>Railway → tu servicio → Variables → New Variable</b><br>
+          Nombre: <code>IG_SESSION_JSON</code> · Valor: el texto de abajo. Railway guarda las variables aunque se redeploye.
+        </div>
+        <textarea id="ses-env-val" readonly style="min-height:90px;font-size:.68rem;color:#888"></textarea>
+        <button class="btn btn-p" style="margin-top:8px" onclick="copyEnv()">📋 Copiar valor para Railway</button>
+      </div>
     </div>
   </section>
 </main>
@@ -446,8 +456,19 @@ async function saveSession(){
   const m=$('ses-msg');
   const r=await fetch('/api/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cookies:$('ses-json').value})});
   const d=await r.json();
-  if(r.ok){m.style.color='#4caf50';m.textContent=`Sesión guardada (${d.count} cookies) ✓`;$('ses-json').value='';$('ses-drop').style.borderColor='var(--bd)';loadSession()}
+  if(r.ok){
+    m.style.color='#4caf50';m.textContent=`Sesión guardada (${d.count} cookies) ✓`;
+    $('ses-json').value='';$('ses-drop').style.borderColor='var(--bd)';
+    if(d.envValue){$('ses-env-val').value=d.envValue;$('ses-env').style.display='block';$('ses-env').scrollIntoView({behavior:'smooth'})}
+    loadSession();
+  }
   else{m.style.color='#f85149';m.textContent=d.error||'Error'}
+}
+function copyEnv(){
+  const t=$('ses-env-val');t.select();
+  navigator.clipboard.writeText(t.value).then(()=>{
+    const m=$('ses-msg');m.style.color='#4caf50';m.textContent='✓ Copiado — pégalo en Railway → Variables → IG_SESSION_JSON';
+  });
 }
 async function clearSession(){
   if(!confirm('¿Borrar la sesión guardada?'))return;
