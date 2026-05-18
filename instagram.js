@@ -16,6 +16,31 @@ if (!fs.existsSync(RECORDINGS_DIR)) fs.mkdirSync(RECORDINGS_DIR, { recursive: tr
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
+// Hashtags de emprendimiento (personas, no marcas)
+const DEFAULT_HASHTAGS = [
+  'emprendedora', 'emprendedor', 'emprendimiento',
+  'freelancespain', 'coach', 'entrepreneur',
+  'emprender', 'negociosonline', 'marcapersonal',
+];
+
+// Palabras que indican perfil de empresa/marca (se descartan)
+const COMPANY_RED_FLAGS = [
+  's.l.', ' sl ', ' sa ', 's.a.', ' ltd', ' inc', ' corp',
+  'tienda', 'shop', 'store', 'official', 'oficial',
+  'agencia', 'agency', 'studio', 'estudio', 'soluciones',
+  'marketing digital', 'diseño web', 'ecommerce',
+];
+
+// Palabras que confirman persona emprendedora (suma puntos)
+const ENTREPRENEUR_KEYWORDS = [
+  'emprendedor', 'emprendedora', 'emprendimiento',
+  'fundador', 'fundadora', 'founder', 'ceo', 'coach',
+  'freelance', 'negocio', 'startup', 'entrepreneur',
+  'dueño', 'dueña', 'infoemprendedor', 'infoproducto',
+  'consultor', 'consultora', 'mentor', 'mentora',
+  'creador', 'creadora', 'creator',
+];
+
 let _activePage = null;
 function getActivePage() { return _activePage; }
 
@@ -139,86 +164,226 @@ async function ensureLoggedIn(page, context) {
   await login(page, context);
 }
 
+// ── Perfil ────────────────────────────────────────────────────
+function isCompanyAccount(username, bio, name) {
+  const text = ((username || '') + ' ' + (bio || '') + ' ' + (name || '')).toLowerCase();
+  return COMPANY_RED_FLAGS.some((f) => text.includes(f));
+}
+function entrepreneurScore(bio) {
+  const b = (bio || '').toLowerCase();
+  return ENTREPRENEUR_KEYWORDS.filter((k) => b.includes(k)).length;
+}
+
 async function fetchProfileBio(page, username) {
   try {
-    await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded' });
-    await randomDelay(1000, 2000);
+    await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await randomDelay(800, 1500);
     return await page.evaluate(() => {
-      const el = document.querySelector('span._ap3a') ||
+      const el =
+        document.querySelector('span._ap3a') ||
         document.querySelector('h1 + div span') ||
-        document.querySelector('div[class*="x7a106z"] span');
+        document.querySelector('div[class*="x7a106z"] span') ||
+        document.querySelector('div.-vDIg span') ||
+        [...document.querySelectorAll('span')].find((s) => s.innerText && s.innerText.length > 20 && s.innerText.length < 200);
       return el ? el.innerText.trim() : '';
     });
   } catch { return ''; }
 }
 
-async function extractSuggestedProfiles(page, limit = 10) {
-  log('[scrape] Explorando perfiles sugeridos...');
-  await page.goto('https://www.instagram.com/explore/people/', { waitUntil: 'domcontentloaded' });
-  await randomDelay(2000, 4000);
-  for (let i = 0; i < 4; i++) await smoothScroll(page, 500);
-  await randomDelay(1000, 2000);
-  await snap(page);
+// Obtiene el username del autor de un post dado su URL
+async function getUsernameFromPost(page, postUrl) {
+  try {
+    await page.goto(postUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+    await randomDelay(600, 1200);
+    return await page.evaluate(() => {
+      // Intenta extraer de links en el header del artículo
+      const candidates = [
+        ...document.querySelectorAll('article header a[href^="/"], div[role="dialog"] header a[href^="/"]'),
+        ...document.querySelectorAll('a[role="link"][href^="/"]'),
+      ];
+      const skip = new Set(['explore', 'p', 'reel', 'tv', 'stories', 'accounts', 'direct', '']);
+      for (const a of candidates) {
+        const slug = a.getAttribute('href').split('/').filter(Boolean)[0];
+        if (slug && !skip.has(slug) && !slug.startsWith('?')) return slug;
+      }
+      return null;
+    });
+  } catch { return null; }
+}
 
-  const profiles = await page.evaluate((max) => {
-    const results = [], seen = new Set();
-    const cards = document.querySelectorAll('div[class*="x1lliihq"] a[href^="/"]');
-    for (const card of cards) {
-      const href = card.getAttribute('href');
-      if (!href || !href.match(/^\/[a-zA-Z0-9._]+\/$/) || seen.has(href)) continue;
-      seen.add(href);
-      const username = href.replace(/\//g, '');
-      const c = card.closest('div[class]');
-      const texts = c ? [...c.querySelectorAll('span, div')].map((e) => e.innerText?.trim()).filter(Boolean) : [];
-      results.push({ username, name: texts[0] || username, bio: texts.slice(1).find((t) => t.length > 10 && t !== username) || '' });
-      if (results.length >= max) break;
+// Extrae hasta `limit` perfiles nuevos desde un hashtag
+async function extractFromHashtag(page, tag, limit) {
+  log(`[scrape] #${tag}...`);
+  try {
+    await page.goto(`https://www.instagram.com/explore/tags/${tag}/`, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await randomDelay(2000, 3500);
+    await dismissCookies(page);
+    for (let i = 0; i < 3; i++) { await smoothScroll(page, 600); await randomDelay(400, 900); }
+    await snap(page);
+
+    const postLinks = await page.evaluate(() =>
+      [...new Set([...document.querySelectorAll('a[href*="/p/"]')].map((a) => a.href))].slice(0, 24)
+    );
+
+    const usernames = [];
+    for (const link of postLinks) {
+      if (usernames.length >= limit) break;
+      const u = await getUsernameFromPost(page, link);
+      if (u && !usernames.includes(u) && !store.hasContacted(u)) usernames.push(u);
+      await randomDelay(400, 900);
     }
-    return results;
-  }, limit);
-
-  const enriched = [];
-  for (const p of profiles) {
-    if (!p.bio) enriched.push({ ...p, bio: await fetchProfileBio(page, p.username) });
-    else enriched.push(p);
-    await randomDelay(800, 1500);
+    return usernames;
+  } catch (e) {
+    log(`[scrape] Error en #${tag}: ${e.message}`);
+    return [];
   }
-  log(`[scrape] ${enriched.length} perfiles encontrados`);
-  return enriched;
+}
+
+// Extrae perfiles de emprendedores desde hashtags, filtrando empresas
+async function extractEntrepreneurProfiles(page, limit = 10) {
+  const cfg = loadConfig();
+  const hashtags = cfg.targetHashtags && cfg.targetHashtags.length ? cfg.targetHashtags : DEFAULT_HASHTAGS;
+  const seen = new Set();
+  const rawUsernames = [];
+
+  for (const tag of hashtags) {
+    if (rawUsernames.length >= limit * 3) break;
+    const users = await extractFromHashtag(page, tag, Math.ceil(limit / 2) + 3);
+    for (const u of users) {
+      if (!seen.has(u)) { seen.add(u); rawUsernames.push(u); }
+    }
+  }
+
+  log(`[scrape] ${rawUsernames.length} perfiles candidatos encontrados`);
+
+  // Enriquecer con bio y filtrar
+  const profiles = [];
+  for (const username of rawUsernames) {
+    if (profiles.length >= limit * 2) break;
+    if (store.hasContacted(username)) continue;
+
+    await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    await randomDelay(800, 1500);
+
+    const info = await page.evaluate(() => {
+      const bioEl =
+        document.querySelector('span._ap3a') ||
+        document.querySelector('h1 + div span') ||
+        document.querySelector('div[class*="x7a106z"] span') ||
+        [...document.querySelectorAll('span')].find((s) => s.innerText && s.innerText.length > 15 && s.innerText.length < 200);
+
+      const nameEl = document.querySelector('h2, h1, span[class*="x1lliihq"]');
+      const isPrivate = !!document.querySelector('h2[class*="x1lliihq"] + p, article p');
+      const followerText = [...document.querySelectorAll('span[title]')].map((s) => s.title).join(' ');
+
+      return {
+        bio: bioEl ? bioEl.innerText.trim() : '',
+        name: nameEl ? nameEl.innerText.trim() : username,
+        isPrivate,
+        followerText,
+      };
+    });
+
+    // Descartar cuentas privadas y empresas
+    if (info.isPrivate) { log(`[scrape] @${username} privada, omitida`); continue; }
+    if (isCompanyAccount(username, info.bio, info.name)) { log(`[scrape] @${username} parece empresa, omitida`); continue; }
+
+    const score = entrepreneurScore(info.bio);
+    profiles.push({ username, name: info.name, bio: info.bio, _score: score });
+    await randomDelay(600, 1200);
+  }
+
+  // Ordenar: primero los que tienen más keywords de emprendimiento en bio
+  profiles.sort((a, b) => b._score - a._score);
+
+  log(`[scrape] ${profiles.length} emprendedores válidos`);
+  return profiles;
+}
+
+// ── DM ────────────────────────────────────────────────────────
+async function findMessageButton(page) {
+  // Estrategia 1: selectores de texto directo
+  const textSelectors = [
+    '[role="button"]:has-text("Message")',
+    '[role="button"]:has-text("Mensaje")',
+    '[role="button"]:has-text("Enviar mensaje")',
+    'button:has-text("Message")',
+    'button:has-text("Mensaje")',
+  ];
+  for (const sel of textSelectors) {
+    try { const el = await page.$(sel); if (el) return el; } catch {}
+  }
+
+  // Estrategia 2: buscar por texto en todos los botones via evaluate
+  try {
+    const handle = await page.evaluateHandle(() => {
+      const all = [...document.querySelectorAll('[role="button"], button')];
+      return all.find((el) => /^(message|mensaje|enviar mensaje)$/i.test(el.innerText?.trim())) || null;
+    });
+    if (handle && (await handle.asElement())) return handle.asElement();
+  } catch {}
+
+  // Estrategia 3: aria-label
+  try {
+    const el = await page.$('[aria-label*="essage"], [aria-label*="ensaje"]');
+    if (el) return el;
+  } catch {}
+
+  return null;
 }
 
 async function sendDM(page, username, message) {
   log(`[dm] Abriendo perfil: @${username}`);
-  await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded', timeout: 20000 });
   await randomDelay(1500, 3000);
   await smoothScroll(page, 200);
   await randomDelay(500, 1000);
   await snap(page);
 
-  const msgBtn = await page.$('div[role="button"]:has-text("Message"), button:has-text("Message"), div[role="button"]:has-text("Enviar mensaje")');
-  if (!msgBtn) { log(`[dm] Sin botón Mensaje para @${username}, se omite`); return false; }
+  const msgBtn = await findMessageButton(page);
+  if (!msgBtn) {
+    log(`[dm] Sin botón Mensaje para @${username} (cuenta privada o sin DMs), se omite`);
+    return false;
+  }
 
   await msgBtn.click();
   await randomDelay(2000, 4000);
-  const notNow = await page.$('button:has-text("Not Now"), button:has-text("Ahora no")');
-  if (notNow) { await notNow.click(); await randomDelay(800, 1500); }
+
+  // Descartar popups
+  for (const txt of ['Not Now', 'Ahora no', 'No ahora', 'Cancel', 'Cancelar']) {
+    try {
+      const btn = await page.$(`button:has-text("${txt}")`);
+      if (btn) { await btn.click(); await randomDelay(600, 1200); break; }
+    } catch {}
+  }
   await snap(page);
 
-  const input = await page.waitForSelector(
-    'div[contenteditable="true"][role="textbox"], textarea[placeholder*="Message"], textarea[placeholder*="Mensaje"]',
-    { timeout: 10000 }
-  );
+  // Esperar el campo de texto del DM
+  let input = null;
+  try {
+    input = await page.waitForSelector(
+      'div[contenteditable="true"][role="textbox"], textarea[placeholder*="essage"], textarea[placeholder*="ensaje"], div[aria-label*="essage"], div[aria-label*="ensaje"]',
+      { timeout: 12000 }
+    );
+  } catch {
+    log(`[dm] No apareció el cuadro de texto para @${username}, se omite`);
+    await snap(page);
+    return false;
+  }
+
   await input.click();
   await randomDelay(500, 1000);
-  for (const ch of message) await page.keyboard.type(ch, { delay: randomInt(80, 200) });
+  for (const ch of message) await page.keyboard.type(ch, { delay: randomInt(60, 160) });
   await snap(page);
   await randomDelay(800, 1500);
   await page.keyboard.press('Enter');
   await randomDelay(1500, 3000);
   await snap(page);
-  log(`[dm] Mensaje enviado a @${username}`);
+  log(`[dm] ✓ Mensaje enviado a @${username}`);
   return true;
 }
 
+// ── Outreach principal ────────────────────────────────────────
 async function runOutreach(dailyLimit, trigger = 'manual') {
   const cfg = loadConfig();
   dailyLimit = dailyLimit || cfg.dailyLimit;
@@ -246,29 +411,31 @@ async function runOutreach(dailyLimit, trigger = 'manual') {
   let sent = 0, skipped = 0, errors = 0;
   try {
     await ensureLoggedIn(page, context);
-    const profiles = await extractSuggestedProfiles(page, dailyLimit + 10);
+    const profiles = await extractEntrepreneurProfiles(page, dailyLimit + 5);
     const fresh = profiles.filter((p) => !store.hasContacted(p.username));
-    log(`[outreach] ${fresh.length} perfiles nuevos (límite ${dailyLimit})`);
+    log(`[outreach] ${fresh.length} perfiles de emprendedores listos`);
 
     const { generateDM } = require('./llm');
     let count = 0;
     for (const profile of fresh) {
       if (count >= dailyLimit) break;
-      log(`[outreach] Procesando @${profile.username}`);
+      log(`[outreach] Procesando @${profile.username} (score: ${profile._score || 0})`);
       let message = '', status = 'error';
       try {
         message = await generateDM(profile.bio || 'emprendedor en Instagram');
-        log(`[llm] DM: ${message.substring(0, 55)}...`);
+        log(`[llm] DM: ${message.substring(0, 60)}...`);
         const ok = await sendDM(page, profile.username, message);
         status = ok ? 'sent' : 'skipped';
       } catch (err) {
         log(`[outreach] Error @${profile.username}: ${err.message}`);
+        status = 'error';
       }
       if (status === 'sent') sent++;
       else if (status === 'skipped') skipped++;
       else errors++;
 
-      store.addLead({ ...profile, message, status, timestamp: new Date().toISOString() });
+      const { _score, ...profileData } = profile;
+      store.addLead({ ...profileData, message, status, timestamp: new Date().toISOString() });
       store.updateRun(runId, { sent, skipped, errors });
       count++;
 
