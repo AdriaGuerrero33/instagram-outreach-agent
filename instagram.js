@@ -16,11 +16,11 @@ if (!fs.existsSync(RECORDINGS_DIR)) fs.mkdirSync(RECORDINGS_DIR, { recursive: tr
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
-// Hashtags de emprendimiento (personas, no marcas)
-const DEFAULT_HASHTAGS = [
+// Búsquedas de emprendedores (personas, no marcas)
+const DEFAULT_QUERIES = [
   'emprendedora', 'emprendedor', 'emprendimiento',
-  'freelancespain', 'coach', 'entrepreneur',
-  'emprender', 'negociosonline', 'marcapersonal',
+  'coach negocios', 'mentora negocios', 'infoproductos',
+  'marca personal', 'freelance', 'negocios online',
 ];
 
 // Palabras que indican perfil de empresa/marca (se descartan)
@@ -190,118 +190,76 @@ async function fetchProfileBio(page, username) {
   } catch { return ''; }
 }
 
-// Obtiene el username del autor de un post dado su URL
-async function getUsernameFromPost(page, postUrl) {
-  try {
-    await page.goto(postUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
-    await randomDelay(600, 1200);
-    return await page.evaluate(() => {
-      // Intenta extraer de links en el header del artículo
-      const candidates = [
-        ...document.querySelectorAll('article header a[href^="/"], div[role="dialog"] header a[href^="/"]'),
-        ...document.querySelectorAll('a[role="link"][href^="/"]'),
-      ];
-      const skip = new Set(['explore', 'p', 'reel', 'tv', 'stories', 'accounts', 'direct', '']);
-      for (const a of candidates) {
-        const slug = a.getAttribute('href').split('/').filter(Boolean)[0];
-        if (slug && !skip.has(slug) && !slug.startsWith('?')) return slug;
-      }
-      return null;
-    });
-  } catch { return null; }
+function isContextClosedError(e) {
+  return /closed|crash|detached|Navigation/i.test(e && e.message || '');
 }
 
-// Extrae hasta `limit` perfiles nuevos desde un hashtag
-async function extractFromHashtag(page, tag, limit) {
-  log(`[scrape] #${tag}...`);
+// Búsqueda rápida vía API interna de Instagram (usa las cookies del contexto)
+async function searchUsers(page, query) {
   try {
-    await page.goto(`https://www.instagram.com/explore/tags/${tag}/`, { waitUntil: 'domcontentloaded', timeout: 20000 });
-    await randomDelay(2000, 3500);
-    await dismissCookies(page);
-    for (let i = 0; i < 3; i++) { await smoothScroll(page, 600); await randomDelay(400, 900); }
-    await snap(page);
+    const result = await page.evaluate(async (q) => {
+      try {
+        const r = await fetch(
+          `https://www.instagram.com/web/search/topsearch/?context=blended&query=${encodeURIComponent(q)}&include_reel=false`,
+          { headers: { 'X-IG-App-ID': '936619743392459' }, credentials: 'include' }
+        );
+        if (!r.ok) return { httpError: r.status };
+        return await r.json();
+      } catch (err) { return { fetchError: String(err) }; }
+    }, query);
 
-    const postLinks = await page.evaluate(() =>
-      [...new Set([...document.querySelectorAll('a[href*="/p/"]')].map((a) => a.href))].slice(0, 24)
-    );
+    if (result.httpError) { log(`[scrape] "${query}" → HTTP ${result.httpError}`); return []; }
+    if (result.fetchError) { log(`[scrape] "${query}" → ${result.fetchError}`); return []; }
 
-    const usernames = [];
-    for (const link of postLinks) {
-      if (usernames.length >= limit) break;
-      const u = await getUsernameFromPost(page, link);
-      if (u && !usernames.includes(u) && !store.hasContacted(u)) usernames.push(u);
-      await randomDelay(400, 900);
-    }
-    return usernames;
+    return (result.users || []).map((u) => ({
+      username: u.user.username,
+      name: u.user.full_name || u.user.username,
+      isPrivate: !!u.user.is_private,
+    }));
   } catch (e) {
-    log(`[scrape] Error en #${tag}: ${e.message}`);
+    if (isContextClosedError(e)) throw e;
+    log(`[scrape] Error buscando "${query}": ${e.message}`);
     return [];
   }
 }
 
-// Extrae perfiles sugeridos de explore/people
-async function extractSuggested(page, limit) {
-  log('[scrape] Explorando perfiles sugeridos...');
-  try {
-    await page.goto('https://www.instagram.com/explore/people/', { waitUntil: 'domcontentloaded', timeout: 20000 });
-    await randomDelay(2000, 3500);
-    await dismissCookies(page);
-    for (let i = 0; i < 4; i++) { await smoothScroll(page, 500); await randomDelay(400, 800); }
-    await snap(page);
-
-    return await page.evaluate((max) => {
-      const results = [], seen = new Set();
-      const cards = document.querySelectorAll('div[class*="x1lliihq"] a[href^="/"]');
-      for (const card of cards) {
-        const href = card.getAttribute('href');
-        if (!href || !href.match(/^\/[a-zA-Z0-9._]+\/$/) || seen.has(href)) continue;
-        seen.add(href);
-        const username = href.replace(/\//g, '');
-        if (results.length >= max) break;
-        results.push(username);
-      }
-      return results;
-    }, limit * 3);
-  } catch (e) {
-    log(`[scrape] Error en sugeridos: ${e.message}`);
-    return [];
-  }
-}
-
-// Extrae perfiles de emprendedores (sugeridos + hashtags), filtrando empresas
+// Extrae perfiles de emprendedores vía búsqueda, filtrando empresas/privados
 async function extractEntrepreneurProfiles(page, limit = 10) {
   const cfg = loadConfig();
-  const hashtags = cfg.targetHashtags && cfg.targetHashtags.length ? cfg.targetHashtags : DEFAULT_HASHTAGS;
+  const queries = cfg.searchQueries && cfg.searchQueries.length ? cfg.searchQueries : DEFAULT_QUERIES;
   const seen = new Set();
-  const rawUsernames = [];
+  const candidates = [];
 
-  // 1. Sugeridos de explore/people
-  const suggested = await extractSuggested(page, limit);
-  for (const u of suggested) {
-    if (!seen.has(u) && !store.hasContacted(u)) { seen.add(u); rawUsernames.push(u); }
-  }
-
-  // 2. Hashtags si necesitamos más candidatos
-  if (rawUsernames.length < limit * 2) {
-    for (const tag of hashtags) {
-      if (rawUsernames.length >= limit * 3) break;
-      const users = await extractFromHashtag(page, tag, Math.ceil(limit / 2) + 3);
-      for (const u of users) {
-        if (!seen.has(u) && !store.hasContacted(u)) { seen.add(u); rawUsernames.push(u); }
-      }
+  for (const q of queries) {
+    if (candidates.length >= limit * 4) break;
+    log(`[scrape] Buscando "${q}"...`);
+    const users = await searchUsers(page, q);
+    for (const u of users) {
+      if (seen.has(u.username) || u.isPrivate) continue;
+      if (store.hasContacted(u.username)) continue;
+      if (isCompanyAccount(u.username, '', u.name)) continue;
+      seen.add(u.username);
+      candidates.push(u);
     }
+    await randomDelay(1500, 3000);
   }
 
-  log(`[scrape] ${rawUsernames.length} perfiles candidatos encontrados`);
+  log(`[scrape] ${candidates.length} candidatos de búsqueda`);
 
-  // Enriquecer con bio y filtrar
+  // Visitar cada perfil UNA vez para leer la bio y puntuar
   const profiles = [];
-  for (const username of rawUsernames) {
+  for (const c of candidates) {
     if (profiles.length >= limit * 2) break;
-    if (store.hasContacted(username)) continue;
+    if (page.isClosed()) { log('[scrape] Navegador cerrado, deteniendo scrape'); break; }
+    if (store.hasContacted(c.username)) continue;
 
-    await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded', timeout: 20000 });
-    await randomDelay(800, 1500);
+    try {
+      await page.goto(`https://www.instagram.com/${c.username}/`, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    } catch (e) {
+      if (isContextClosedError(e)) { log('[scrape] Navegador cerrado, deteniendo scrape'); break; }
+      continue;
+    }
+    await randomDelay(700, 1300);
 
     const info = await page.evaluate(() => {
       const bioEl =
@@ -309,32 +267,20 @@ async function extractEntrepreneurProfiles(page, limit = 10) {
         document.querySelector('h1 + div span') ||
         document.querySelector('div[class*="x7a106z"] span') ||
         [...document.querySelectorAll('span')].find((s) => s.innerText && s.innerText.length > 15 && s.innerText.length < 200);
-
-      const nameEl = document.querySelector('h2, h1, span[class*="x1lliihq"]');
       const isPrivate = !!document.querySelector('h2[class*="x1lliihq"] + p, article p');
-      const followerText = [...document.querySelectorAll('span[title]')].map((s) => s.title).join(' ');
-
-      return {
-        bio: bioEl ? bioEl.innerText.trim() : '',
-        name: nameEl ? nameEl.innerText.trim() : username,
-        isPrivate,
-        followerText,
-      };
+      return { bio: bioEl ? bioEl.innerText.trim() : '', isPrivate };
     });
 
-    // Descartar cuentas privadas y empresas
-    if (info.isPrivate) { log(`[scrape] @${username} privada, omitida`); continue; }
-    if (isCompanyAccount(username, info.bio, info.name)) { log(`[scrape] @${username} parece empresa, omitida`); continue; }
+    if (info.isPrivate) { log(`[scrape] @${c.username} privada, omitida`); continue; }
+    if (isCompanyAccount(c.username, info.bio, c.name)) { log(`[scrape] @${c.username} parece empresa, omitida`); continue; }
 
-    const score = entrepreneurScore(info.bio);
-    if (score < 1) { log(`[scrape] @${username} sin keywords de emprendimiento, omitida`); continue; }
-    profiles.push({ username, name: info.name, bio: info.bio, _score: score });
-    await randomDelay(600, 1200);
+    const score = entrepreneurScore(`${info.bio} ${c.name}`);
+    if (score < 1) { log(`[scrape] @${c.username} sin keywords de emprendimiento, omitida`); continue; }
+    profiles.push({ username: c.username, name: c.name, bio: info.bio, _score: score });
+    await randomDelay(500, 1100);
   }
 
-  // Ordenar: primero los que tienen más keywords de emprendimiento en bio
   profiles.sort((a, b) => b._score - a._score);
-
   log(`[scrape] ${profiles.length} emprendedores válidos`);
   return profiles;
 }
@@ -459,6 +405,7 @@ async function runOutreach(dailyLimit, trigger = 'manual', stopSignal = {}) {
     for (const profile of fresh) {
       if (count >= dailyLimit) break;
       if (stopSignal.stop) { log('[outreach] ⏹ Parada solicitada — detenido'); break; }
+      if (page.isClosed()) { log('[outreach] Navegador cerrado (redeploy) — detenido'); break; }
 
       // Doble comprobación anti-duplicado justo antes de enviar
       if (store.hasContacted(profile.username)) {
@@ -499,9 +446,13 @@ async function runOutreach(dailyLimit, trigger = 'manual', stopSignal = {}) {
     }
     log(`[outreach] Terminado. ${sent} enviados, ${skipped} omitidos, ${errors} errores.`);
   } catch (err) {
-    log(`[outreach] Error inesperado: ${err.message}`);
-    try { await snap(page); } catch {}
-    errors++;
+    if (isContextClosedError(err)) {
+      log('[outreach] Navegador cerrado (probablemente un redeploy de Railway). Se reintentará en la próxima ejecución.');
+    } else {
+      log(`[outreach] Error inesperado: ${err.message}`);
+      try { await snap(page); } catch {}
+      errors++;
+    }
   } finally {
     _activePage = null;
     try {
